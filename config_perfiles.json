@@ -1,0 +1,38 @@
+{
+  "perfiles": [
+    {
+      "id": "b29fbd8b-d57a-4c70-9629-f5ba19b04750",
+      "nombre": "registro de cajeros",
+      "carpeta_origen": "C:\\Proyectos",
+      "patron_archivo": "cierre_202606.xlsx",
+      "hoja": "CIERRE",
+      "rangos": [
+        "B23",
+        "G49"
+      ],
+      "rename_map": {},
+      "destino": {
+        "tipo": "csv",
+        "carpeta": "C:/Users/Jose Alvarez/Desktop/Respaldo",
+        "nombre_archivo": "perdidas_cajas",
+        "modo": "append"
+      },
+      "schedule": {
+        "hora": "21:00",
+        "activo": true,
+        "ultimo_run": "2026-06-25T21:14:31.663404"
+      },
+      "notificacion": {
+        "email_destino": "jmalvarez.tec@gmail.com",
+        "smtp_host": "smtp.gmail.com",
+        "smtp_port": 587,
+        "smtp_user": "",
+        "smtp_pass": "",
+        "en_error": true,
+        "en_exito": true
+      },
+      "creado_en": "2026-06-25T20:06:56.454804"
+    }
+  ],
+  "smtp_global": {}
+}

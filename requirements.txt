@@ -1,0 +1,7 @@
+pandas
+openpyxl
+schedule
+pyinstaller
+
+# Windows (solo en producción, comentar en desarrollo/Mac/Linux)
+# pywin32
