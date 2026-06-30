@@ -14,15 +14,10 @@ import pandas as pd
 import openpyxl
 from datetime import datetime
 
+from core.security import validar_excel, ArchivoInvalido, MAX_SHEETS
+
 
 class ExcelReader:
-    def inspeccionar_celda(self, nombre_hoja: str, celda: str):
-        wb = openpyxl.load_workbook(self.ruta_archivo, data_only=False)
-        ws = wb[nombre_hoja]
-        c = ws[celda]
-        print(f"Valor: {c.value}")
-        print(f"Tipo:  {type(c.value)}")
-
     def __init__(self):
         self.ruta_archivo = None
         self.df_actual    = None
@@ -32,11 +27,27 @@ class ExcelReader:
     # ── Apertura ─────────────────────────────────────────────────────────────
 
     def abrir(self, ruta: str):
-        """Carga el archivo y lo prepara para lectura."""
+        """Carga el archivo y lo prepara para lectura.
+
+        Antes de tocarlo con pandas/openpyxl, se valida que sea un Excel
+        real y seguro: extensión coherente con su contenido real, sin
+        macros, sin compresión anómala tipo "zip bomb", etc. Si algo no
+        cuadra, se lanza ArchivoInvalido con un mensaje claro y NO se abre.
+        """
         if not os.path.exists(ruta):
             raise FileNotFoundError(f"No se encontró el archivo: {ruta}")
+
+        validar_excel(ruta)  # lanza ArchivoInvalido si el archivo no es seguro
+
         self.ruta_archivo = ruta
         self.excel_file   = pd.ExcelFile(ruta, engine="openpyxl")
+
+        if len(self.excel_file.sheet_names) > MAX_SHEETS:
+            raise ArchivoInvalido(
+                f"El archivo tiene {len(self.excel_file.sheet_names)} hojas, "
+                f"supera el límite permitido ({MAX_SHEETS})."
+            )
+
         return self
 
     def resolver_archivo_mensual(self, carpeta: str, patron: str, fecha: datetime = None) -> str:
@@ -70,6 +81,36 @@ class ExcelReader:
             f"No se encontró '{nombre}' en '{carpeta}'.\n"
             f"Verifica que el patrón '{patron}' coincida con el nombre real del archivo."
         )
+
+    def obtener_vista_previa(self, nombre_hoja: str, max_filas=40, max_columnas=20):
+        """
+        Lee una porción cruda de la hoja (sin pandas, sin limpieza) para
+        alimentar el selector de rango por clic. Devuelve una matriz de
+        strings; el truncado real (si hace falta) lo decide la UI según
+        el ancho de columna calculado dinámicamente, no aquí.
+        """
+        self._check_abierto()
+        wb = openpyxl.load_workbook(self.ruta_archivo, read_only=True, data_only=True)
+        ws = wb[nombre_hoja]
+
+        filas = []
+        for i, row in enumerate(ws.iter_rows(min_row=1, max_row=max_filas, max_col=max_columnas)):
+            if i >= max_filas:
+                break
+            fila_valores = []
+            for cell in row:
+                valor = cell.value
+                if valor is None:
+                    texto = ""
+                else:
+                    texto = str(valor).strip()
+                    if len(texto) > 40:
+                        texto = texto[:37] + "…"
+                fila_valores.append(texto)
+            filas.append(fila_valores)
+
+        wb.close()
+        return filas
 
     # ── Hojas ────────────────────────────────────────────────────────────────
 

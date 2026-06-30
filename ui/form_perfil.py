@@ -8,9 +8,6 @@ rangos, destino, horario y notificación.
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
                     SUCCESS, ERROR, TEXT_DARK, TEXT_LIGHT, TEXT_MUTED, BORDER,
                     FORMATOS_DESTINO)

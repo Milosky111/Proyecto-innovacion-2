@@ -26,6 +26,24 @@ from core.exporters     import exportar
 from core.logger        import RunLogger
 from core.notifier      import notificar
 from core.config_store  import ConfigStore
+from core.audit_report  import generar_informe
+
+
+def _ruta_salida(destino: dict, perfil_nombre: str) -> str:
+    """
+    Reconstruye la ruta del archivo exportado por exportar(), sin volver a
+    tocar disco. Debe coincidir exactamente con la lógica de exporters.py.
+    """
+    tipo = destino.get("tipo", "csv").lower()
+    carpeta = destino.get("carpeta", ".")
+    nombre = destino.get("nombre_archivo") or perfil_nombre or "exportacion"
+    ext = {"csv": "csv", "xlsx": "xlsx", "sqlite": "db"}.get(tipo, "csv")
+    return os.path.join(carpeta, f"{nombre}.{ext}")
+
+
+def _sanitizar_nombre_archivo(nombre: str) -> str:
+    import re
+    return re.sub(r"[^a-zA-Z0-9_.\-]", "_", nombre)
 
 
 def ejecutar_perfil(perfil: dict, logger: RunLogger = None, fecha: datetime = None) -> dict:
@@ -78,6 +96,7 @@ def ejecutar_perfil(perfil: dict, logger: RunLogger = None, fecha: datetime = No
         # 4. Exportar
         n_filas = exportar(df, perfil["destino"], perfil_nombre=perfil["nombre"])
         resultado["filas"] = n_filas
+        resultado["ruta_salida"] = _ruta_salida(perfil["destino"], perfil["nombre"])
 
     except FileNotFoundError as e:
         resultado["estado"] = "sin_archivo"
@@ -98,14 +117,33 @@ def ejecutar_perfil(perfil: dict, logger: RunLogger = None, fecha: datetime = No
         error         = resultado["error"],
     )
 
-    # 6. Notificar
+    # 6. Generar informe de auditoría en PDF (best-effort: si falla, no
+    #    cancela la ejecución, solo se omite como adjunto)
+    ruta_informe = None
     try:
+        carpeta_informes = os.path.join(
+            perfil.get("destino", {}).get("carpeta", "."), "informes_auditoria"
+        )
+        nombre_informe = f"auditoria_{perfil['nombre']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+        nombre_informe = _sanitizar_nombre_archivo(nombre_informe)
+        ruta_informe = os.path.join(carpeta_informes, nombre_informe)
+        generar_informe(
+            logger, ruta_informe,
+            titulo=f"Informe de Auditoría — {perfil['nombre']}"
+        )
+    except Exception:
+        ruta_informe = None  # sin informe, se notifica igual sin ese adjunto
+
+    # 7. Notificar (correo con archivo de salida + informe de auditoría adjuntos)
+    try:
+        adjuntos = [a for a in (resultado.get("ruta_salida"), ruta_informe) if a]
         notificar(
-            perfil  = perfil,
-            estado  = resultado["estado"],
-            filas   = resultado["filas"],
-            archivo = resultado["archivo"],
-            error   = resultado["error"],
+            perfil   = perfil,
+            estado   = resultado["estado"],
+            filas    = resultado["filas"],
+            archivo  = resultado["archivo"],
+            error    = resultado["error"],
+            adjuntos = adjuntos,
         )
     except Exception as e_notif:
         # El fallo de notificación no cancela el resultado
