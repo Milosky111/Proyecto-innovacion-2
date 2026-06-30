@@ -1,6 +1,9 @@
 pandas
-openpyxl
+openpyxl>=3.1.0
+defusedxml
+xlwings
 schedule
+reportlab
 pyinstaller
 
 # Windows (solo en producción, comentar en desarrollo/Mac/Linux)

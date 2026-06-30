@@ -20,15 +20,13 @@ El resultado es un dict:
 
 import tkinter as tk
 from tkinter import ttk, messagebox
-import sys, os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
                     SUCCESS, ERROR, TEXT_DARK, TEXT_LIGHT, TEXT_MUTED,
                     BORDER, ROW_EVEN, ROW_ODD)
 from components import HoverButton
 from core.excel_reader import ExcelReader
+from ui.click_range_selector import ClickRangeSelector
 
 
 class SelectorRangos(tk.Toplevel):
@@ -175,6 +173,12 @@ class SelectorRangos(tk.Toplevel):
                     fg=TEXT_LIGHT, padx=14, pady=5,
                     command=self._previsualizar).pack(side=tk.LEFT, padx=(16, 0))
 
+        HoverButton(row_rango, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
+                    text="🖱  Marcar con clic…",
+                    font=("Segoe UI", 10, "bold"),
+                    fg=ACCENT, padx=14, pady=5,
+                    command=self._abrir_selector_clic).pack(side=tk.LEFT, padx=(8, 0))
+
         # ── Sección previsualización ───────────────────────────────────────
         tk.Label(parent, text="Previsualización (primeras 5 filas)",
                  font=("Segoe UI", 10, "bold"),
@@ -224,6 +228,35 @@ class SelectorRangos(tk.Toplevel):
                     command=self._guardar_rango_hoja).pack(anchor="e", padx=20, pady=10)
 
     # ── Lógica ────────────────────────────────────────────────────────────────
+
+    def _abrir_selector_clic(self):
+        """
+        Abre la grilla visual de selección por clic. Si el usuario confirma
+        un rango, lo escribe en self.entry_rango y dispara la previsualización
+        automáticamente — el resultado se integra al flujo normal del modo
+        texto, no lo reemplaza.
+        """
+        if not self._hoja_actual:
+            messagebox.showwarning("Sin hoja", "Selecciona una hoja primero.", parent=self)
+            return
+
+        try:
+            filas_preview = self.reader.obtener_vista_previa(self._hoja_actual)
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo leer la vista previa:\n{e}", parent=self)
+            return
+
+        if not filas_preview:
+            messagebox.showinfo("Hoja vacía", "Esta hoja no tiene datos para mostrar.", parent=self)
+            return
+
+        selector = ClickRangeSelector(self, filas_preview)
+        self.wait_window(selector)
+
+        if selector.result:
+            self.entry_rango.delete(0, tk.END)
+            self.entry_rango.insert(0, selector.result)
+            self._previsualizar()
 
     def _seleccionar_hoja(self, hoja):
         # Resaltar botón activo

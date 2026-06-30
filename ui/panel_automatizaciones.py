@@ -5,11 +5,8 @@ y permite crear, editar, eliminar y ejecutar manualmente cada uno.
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import threading
-
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
                     SUCCESS, ERROR, WARNING, TEXT_DARK, TEXT_LIGHT,
@@ -18,6 +15,7 @@ from components import HoverButton
 from core.config_store import ConfigStore
 from core.logger       import RunLogger
 from core.runner       import ejecutar_perfil
+from core.audit_report import generar_informe
 
 
 ESTADO_COLOR = {
@@ -65,6 +63,21 @@ class PanelAutomatizaciones(tk.Toplevel):
                     text="+ Nueva automatización", font=("Segoe UI", 10, "bold"),
                     fg=TEXT_LIGHT, padx=14, pady=6,
                     command=self._nueva).pack(side=tk.RIGHT, padx=12)
+
+        HoverButton(toolbar, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
+                    text="📄  Informe de auditoría…", font=("Segoe UI", 10),
+                    fg=ACCENT, padx=12, pady=6,
+                    command=self._exportar_informe).pack(side=tk.RIGHT, padx=(0, 8))
+
+        # Banner de alertas — avisa de fallos recientes sin que el usuario
+        # tenga que leer toda la tabla para darse cuenta.
+        self.banner = tk.Frame(self, bg=BG_MAIN)
+        self.banner.pack(fill=tk.X)
+        self.lbl_banner = tk.Label(
+            self.banner, text="", font=("Segoe UI", 10, "bold"),
+            bg=BG_MAIN, fg=TEXT_DARK, anchor="w", padx=16, pady=8
+        )
+        self.lbl_banner.pack(fill=tk.X)
 
         # Tabla
         frame_tabla = tk.Frame(self, bg=BG_MAIN)
@@ -130,10 +143,19 @@ class PanelAutomatizaciones(tk.Toplevel):
             self.tree.delete(item)
 
         perfiles = self.store.listar_perfiles()
+        fallidas, sin_archivo, ok = [], [], 0
+
         for p in perfiles:
             ultimo = self.logger.ultimo_run(p["id"])
             estado = ultimo["estado"] if ultimo else None
             ts     = ultimo["timestamp"][:16] if ultimo else "—"
+
+            if estado == "error":
+                fallidas.append(p.get("nombre", "Sin nombre"))
+            elif estado == "sin_archivo":
+                sin_archivo.append(p.get("nombre", "Sin nombre"))
+            elif estado == "ok":
+                ok += 1
 
             tag = estado if estado else "sin_run"
             self.tree.insert("", tk.END, iid=p["id"], tags=(tag,), values=(
@@ -144,6 +166,58 @@ class PanelAutomatizaciones(tk.Toplevel):
                 ts,
                 ESTADO_LABEL.get(estado, "—"),
             ))
+
+        self._actualizar_banner(fallidas, sin_archivo, ok)
+
+    def _actualizar_banner(self, fallidas, sin_archivo, ok):
+        """
+        Banner de alerta visible apenas se abre el panel: resume cuántas
+        automatizaciones tienen su última ejecución en error o sin archivo,
+        para que el usuario no tenga que leer toda la tabla.
+        """
+        total_problemas = len(fallidas) + len(sin_archivo)
+
+        if total_problemas == 0:
+            self.banner.configure(bg=BG_MAIN)
+            self.lbl_banner.configure(
+                bg=BG_MAIN, fg=SUCCESS,
+                text=f"✔  Todas las automatizaciones con historial están al día ({ok} con última ejecución exitosa)."
+                if ok else ""
+            )
+            return
+
+        partes = []
+        if fallidas:
+            partes.append(f"{len(fallidas)} con error ({', '.join(fallidas[:3])}{'…' if len(fallidas) > 3 else ''})")
+        if sin_archivo:
+            partes.append(f"{len(sin_archivo)} sin archivo encontrado ({', '.join(sin_archivo[:3])}{'…' if len(sin_archivo) > 3 else ''})")
+
+        self.banner.configure(bg="#FDEDEC")
+        self.lbl_banner.configure(
+            bg="#FDEDEC", fg=ERROR,
+            text=f"⚠  Atención: {' · '.join(partes)}."
+        )
+
+    def _exportar_informe(self):
+        """Genera el informe de auditoría en PDF y lo guarda donde el usuario elija."""
+        ruta = filedialog.asksaveasfilename(
+            title="Guardar informe de auditoría como…",
+            defaultextension=".pdf",
+            filetypes=[("Documento PDF", "*.pdf")],
+            initialfile="informe_auditoria.pdf",
+            parent=self
+        )
+        if not ruta:
+            return
+        try:
+            generar_informe(self.logger, ruta)
+            messagebox.showinfo(
+                "Informe generado",
+                f"El informe de auditoría se guardó en:\n{ruta}",
+                parent=self
+            )
+        except Exception as e:
+            messagebox.showerror("Error al generar informe", str(e), parent=self)
 
     def _get_seleccionado_id(self):
         sel = self.tree.selection()

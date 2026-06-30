@@ -87,3 +87,57 @@ class RunLogger:
         ).fetchone()
         con.close()
         return dict(row) if row else None
+
+    def obtener_resumen(self, desde: str = None, hasta: str = None):
+        """
+        Retorna un resumen agregado del historial, útil para informes de
+        auditoría: totales por estado, totales por perfil, y filas exportadas.
+
+        desde/hasta: strings ISO ("2026-06-01") para acotar el rango; si se
+        omiten, se usa todo el historial disponible.
+        """
+        con = sqlite3.connect(self.db_path)
+        con.row_factory = sqlite3.Row
+
+        condiciones = []
+        params = []
+        if desde:
+            condiciones.append("timestamp >= ?")
+            params.append(desde)
+        if hasta:
+            condiciones.append("timestamp <= ?")
+            params.append(hasta)
+        where = f"WHERE {' AND '.join(condiciones)}" if condiciones else ""
+
+        totales_estado = con.execute(
+            f"SELECT estado, COUNT(*) as n FROM run_log {where} GROUP BY estado",
+            params
+        ).fetchall()
+
+        por_perfil = con.execute(
+            f"""SELECT perfil_nombre,
+                       COUNT(*) as ejecuciones,
+                       SUM(CASE WHEN estado='ok' THEN 1 ELSE 0 END) as exitosas,
+                       SUM(CASE WHEN estado!='ok' THEN 1 ELSE 0 END) as fallidas,
+                       SUM(filas_export) as filas_totales,
+                       MAX(timestamp) as ultima_ejecucion
+                FROM run_log {where}
+                GROUP BY perfil_nombre
+                ORDER BY ultima_ejecucion DESC""",
+            params
+        ).fetchall()
+
+        todas = con.execute(
+            f"SELECT * FROM run_log {where} ORDER BY timestamp DESC",
+            params
+        ).fetchall()
+
+        con.close()
+
+        return {
+            "totales_estado": {r["estado"]: r["n"] for r in totales_estado},
+            "por_perfil": [dict(r) for r in por_perfil],
+            "ejecuciones": [dict(r) for r in todas],
+            "total_ejecuciones": len(todas),
+        }
+
