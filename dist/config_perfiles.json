@@ -1,0 +1,67 @@
+{
+  "perfiles": [
+    {
+      "id": "32a8ae2e-964b-4b19-bba8-5da0beb1f306",
+      "nombre": "",
+      "carpeta_origen": "",
+      "patron_archivo": "",
+      "hoja": "",
+      "rangos": [],
+      "rename_map": {},
+      "destino": {
+        "tipo": "csv",
+        "carpeta": "",
+        "nombre_archivo": "",
+        "modo": "append"
+      },
+      "schedule": {
+        "hora": "07:00",
+        "activo": false,
+        "ultimo_run": null
+      },
+      "notificacion": {
+        "email_destino": "",
+        "smtp_host": "",
+        "smtp_port": 587,
+        "smtp_user": "",
+        "smtp_pass": "",
+        "en_error": true,
+        "en_exito": false
+      },
+      "creado_en": "2026-07-02T12:09:09.688667"
+    },
+    {
+      "id": "5615834b-6231-48ea-9d2c-5a3db0f3f8e4",
+      "nombre": "Cierre",
+      "carpeta_origen": "C:/Users/juand/Desktop/Trabajos/Proyecto_innovacion_emprendimiento_2/Data",
+      "patron_archivo": "Proyecto_cierre_tgm_v2.xlsx",
+      "hoja": "CIERRE",
+      "rangos": [
+        "B1:G40"
+      ],
+      "rename_map": {},
+      "destino": {
+        "tipo": "csv",
+        "carpeta": "C:/Users/juand/Desktop/Trabajos/Proyecto_innovacion_emprendimiento_2/Data",
+        "nombre_archivo": "prueba3",
+        "modo": "append"
+      },
+      "schedule": {
+        "hora": "07:00",
+        "activo": false,
+        "ultimo_run": "2026-07-02T12:11:33.161667"
+      },
+      "notificacion": {
+        "email_destino": "usuario@empresa.cl",
+        "smtp_host": "smtp.gmail.com",
+        "smtp_port": 587,
+        "smtp_user": "",
+        "smtp_pass": "",
+        "en_error": true,
+        "en_exito": false
+      },
+      "creado_en": "2026-07-02T12:09:17.637233"
+    }
+  ],
+  "smtp_global": {}
+}

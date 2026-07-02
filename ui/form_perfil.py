@@ -71,7 +71,7 @@ class FormPerfil(tk.Toplevel):
         self._campo("patron_archivo", "Patrón de nombre",
                     "Ej: cierre_tgm_{YYYYMM}.xlsx  |  tokens: {YYYYMM} {YYYY} {MM}", **pad)
         self._campo_hoja(**pad)
-        self._campo("rangos", "Rangos de celdas (separados por coma)",
+        self._campo("rangos", "Rangos de celdas",
                     "Ej: B3:H30,J3:J30  — vacío = columnas completas", **pad)
 
         # ── Sección: Destino ───────────────────────────────────────────────

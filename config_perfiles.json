@@ -32,6 +32,38 @@
         "en_exito": true
       },
       "creado_en": "2026-06-25T20:06:56.454804"
+    },
+    {
+      "id": "15a156b8-4cb0-432f-9c8c-c1c630b1f62e",
+      "nombre": "super",
+      "carpeta_origen": "C:/Users/juand/Desktop/Trabajos/Proyecto_innovacion_emprendimiento_2/Data",
+      "patron_archivo": "proyecto_cierre_tgm_v2.xlsx",
+      "hoja": "CIERRE",
+      "rangos": [
+        "B1:G40"
+      ],
+      "rename_map": {},
+      "destino": {
+        "tipo": "csv",
+        "carpeta": "C:/Users/juand/Desktop/Trabajos/Proyecto_innovacion_emprendimiento_2/Data",
+        "nombre_archivo": "prueba1",
+        "modo": "append"
+      },
+      "schedule": {
+        "hora": "07:00",
+        "activo": false,
+        "ultimo_run": "2026-07-02T11:53:51.248435"
+      },
+      "notificacion": {
+        "email_destino": "usuario@empresa.cl",
+        "smtp_host": "smtp.gmail.com",
+        "smtp_port": 587,
+        "smtp_user": "",
+        "smtp_pass": "",
+        "en_error": true,
+        "en_exito": true
+      },
+      "creado_en": "2026-07-02T11:51:56.864798"
     }
   ],
   "smtp_global": {}
