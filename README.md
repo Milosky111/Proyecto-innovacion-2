@@ -1,4 +1,3 @@
-```markdown
 # 📊 Extractor de Datos Excel
 
 <p align="center">
