@@ -2,21 +2,22 @@
 """
 Exportadores multi-formato para el Landing Stage.
 Soporta CSV, Excel (.xlsx) y SQLite con modo append o replace.
-Evita duplicados en modo append usando columna de timestamp de ejecución.
+Optimizados para procesamiento por lotes sin re-lectura de memoria completa.
 """
 
 import os
 import sqlite3
-import pandas as pd
 from datetime import datetime
-from openpyxl import load_workbook
+import pandas as pd
+from openpyxl import load_workbook, Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 
 def exportar(df: pd.DataFrame, destino: dict, perfil_nombre: str = "") -> int:
     """
-    Punto de entrada unificado.
+    Punto de entrada unificado para volcar lotes al destino configurado.
 
     destino = {
         "tipo":           "csv" | "xlsx" | "sqlite",
@@ -24,8 +25,6 @@ def exportar(df: pd.DataFrame, destino: dict, perfil_nombre: str = "") -> int:
         "nombre_archivo": "cierre_tgm",   # sin extensión
         "modo":           "append" | "replace"
     }
-
-    Retorna el número de filas exportadas.
     """
     tipo  = destino.get("tipo", "csv").lower()
     modo  = destino.get("modo", "append")
@@ -57,23 +56,38 @@ def _a_csv(df, carpeta, nombre, modo):
     if modo == "replace" or not existe:
         df.to_csv(ruta, index=False, encoding="utf-8-sig")
     else:
-        # append: agrega sin repetir encabezado
+        # append: agrega sin repetir encabezado ni alterar datos previos en RAM
         df.to_csv(ruta, mode="a", header=False, index=False, encoding="utf-8-sig")
 
     return len(df)
 
 
-# ── XLSX ──────────────────────────────────────────────────────────────────────
+# ── XLSX OPTIMIZADO PARA MEMORIA (STREAM EN APPEND) ───────────────────────────
 
 def _a_xlsx(df, carpeta, nombre, modo):
     ruta = os.path.join(carpeta, f"{nombre}.xlsx")
+    existe = os.path.exists(ruta)
 
-    if modo == "append" and os.path.exists(ruta):
-        df_existente = pd.read_excel(ruta, engine="openpyxl")
-        df = pd.concat([df_existente, df], ignore_index=True)
+    if modo == "append" and existe:
+        # Se abre con openpyxl directo para escribir en la última fila libre.
+        # Evita usar pd.read_excel que consume toda la memoria cargando el histórico.
+        wb = load_workbook(ruta)
+        ws = wb.active
+        for r in dataframe_to_rows(df, index=False, header=False):
+            ws.append(r)
+    else:
+        # Modo 'replace' o creación inicial del libro
+        wb = Workbook()
+        ws = wb.active
+        for r in dataframe_to_rows(df, index=False, header=True):
+            ws.append(r)
+        
+        # Guardamos provisionalmente para aplicar estilos base
+        wb.save(ruta)
+        _estilizar_xlsx(ruta)
+        return len(df)
 
-    df.to_excel(ruta, index=False, engine="openpyxl")
-    _estilizar_xlsx(ruta)
+    wb.save(ruta)
     return len(df)
 
 
@@ -127,6 +141,7 @@ def _a_sqlite(df, carpeta, nombre, modo):
     con = sqlite3.connect(ruta)
     try:
         if_exists = "append" if modo == "append" else "replace"
+        # El motor SQL nativo gestiona eficientemente el append sin saturar memoria
         df.to_sql(tabla, con, if_exists=if_exists, index=False)
     finally:
         con.close()

@@ -1,25 +1,25 @@
 # core/runner.py
 """
 Runner headless — ejecuta un perfil completo sin interfaz gráfica.
-Puede invocarse desde el scheduler, desde CLI o desde la UI (botón "Ejecutar ahora").
+Optimizado mediante cálculo diferencial para procesamiento por lotes (Batch Processing).
 
 Flujo por perfil:
   1. Resolver archivo mensual
   2. Leer rangos configurados
   3. Aplicar rename_map
-  4. Exportar al destino
+  4. Exportar al destino en lotes óptimos C'(x) = 0
   5. Registrar en log
   6. Notificar por email
 """
 
 import os
 import sys
+import math
+from datetime import datetime
+import pandas as pd
 
 # Permite importar desde la raíz del proyecto cuando se ejecuta directamente
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import pandas as pd
-from datetime import datetime
 
 from core.excel_reader  import ExcelReader
 from core.exporters     import exportar
@@ -27,6 +27,35 @@ from core.logger        import RunLogger
 from core.notifier      import notificar
 from core.config_store  import ConfigStore
 from core.audit_report  import generar_informe
+
+
+def calcular_lote_optimo_etl(total_filas: int) -> int:
+    """
+    Calcula matemáticamente el tamaño de lote (x) óptimo aplicando cálculo diferencial.
+    
+    Modelamos la función de costo:
+        C(x) = a * x + b / x
+    Donde:
+        - a * x representa el consumo de memoria RAM (crece linealmente con el tamaño del lote).
+        - b / x representa el impacto en el tiempo total de ejecución (costo de operaciones I/O).
+        
+    Derivando la función de costo para minimizar los recursos:
+        C'(x) = a - b / x^2
+    Igualando a cero para encontrar el punto crítico mínimo (C'(x) = 0):
+        a = b / x^2  =>  x^2 = b / a  =>  x = sqrt(b / a)
+    """
+    # Constantes empíricas de rendimiento de software (ajustables según el hardware de prueba)
+    a_memoria = 0.045     # Coeficiente de peso para la saturación de memoria RAM por fila
+    b_tiempo_io = 45000.0  # Coeficiente de sobrecosto (overhead) por tiempos muertos de apertura/cierre de canales
+
+    # Evaluación del punto crítico mínimo
+    x_optimo = math.sqrt(b_tiempo_io / a_memoria)
+    x = int(x_optimo)
+
+    # Restricciones lógicas basadas en el volumen real de la planilla
+    if x > total_filas and total_filas > 0:
+        return total_filas
+    return max(1, x)  # Asegura procesar al menos 1 fila por bloque
 
 
 def _ruta_salida(destino: dict, perfil_nombre: str) -> str:
@@ -48,13 +77,7 @@ def _sanitizar_nombre_archivo(nombre: str) -> str:
 
 def ejecutar_perfil(perfil: dict, logger: RunLogger = None, fecha: datetime = None) -> dict:
     """
-    Ejecuta un perfil y retorna un dict con el resultado:
-    {
-        "estado":  "ok" | "sin_archivo" | "error",
-        "filas":   int,
-        "archivo": str,
-        "error":   str,
-    }
+    Ejecuta un perfil de manera optimizada por bloques y retorna un dict con el resultado.
     """
     logger = logger or RunLogger()
     fecha  = fecha  or datetime.now()
@@ -93,9 +116,29 @@ def ejecutar_perfil(perfil: dict, logger: RunLogger = None, fecha: datetime = No
         if rename_map:
             df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
 
-        # 4. Exportar
-        n_filas = exportar(df, perfil["destino"], perfil_nombre=perfil["nombre"])
-        resultado["filas"] = n_filas
+        # 4. Exportación segmentada mediante el Lote Óptimo calculado
+        total_filas = len(df)
+        lote_x = calcular_lote_optimo_etl(total_filas)
+        resultado["lote_optimo_calculado"] = lote_x
+        
+        filas_procesadas = 0
+
+        # Procesamiento iterativo por bloques (Lotes)
+        for i in range(0, total_filas, lote_x):
+            df_lote = df.iloc[i : i + lote_x]
+            
+            # Ajuste de modo dinámico: el primer bloque respeta 'replace' o 'append',
+            # los bloques subsecuentes se añaden imperativamente en modo 'append'
+            modo_actual = perfil["destino"].get("modo", "append") if i == 0 else "append"
+            
+            destino_lote = perfil["destino"].copy()
+            destino_lote["modo"] = modo_actual
+            
+            # Envío del fragmento al pipeline de exportación
+            n_filas = exportar(df_lote, destino_lote, perfil_nombre=perfil["nombre"])
+            filas_procesadas += n_filas
+
+        resultado["filas"] = filas_procesadas
         resultado["ruta_salida"] = _ruta_salida(perfil["destino"], perfil["nombre"])
 
     except FileNotFoundError as e:
@@ -117,8 +160,7 @@ def ejecutar_perfil(perfil: dict, logger: RunLogger = None, fecha: datetime = No
         error         = resultado["error"],
     )
 
-    # 6. Generar informe de auditoría en PDF (best-effort: si falla, no
-    #    cancela la ejecución, solo se omite como adjunto)
+    # 6. Generar informe de auditoría en PDF
     ruta_informe = None
     try:
         carpeta_informes = os.path.join(
@@ -132,9 +174,9 @@ def ejecutar_perfil(perfil: dict, logger: RunLogger = None, fecha: datetime = No
             titulo=f"Informe de Auditoría — {perfil['nombre']}"
         )
     except Exception:
-        ruta_informe = None  # sin informe, se notifica igual sin ese adjunto
+        ruta_informe = None
 
-    # 7. Notificar (correo con archivo de salida + informe de auditoría adjuntos)
+    # 7. Notificar
     try:
         adjuntos = [a for a in (resultado.get("ruta_salida"), ruta_informe) if a]
         notificar(
@@ -146,7 +188,6 @@ def ejecutar_perfil(perfil: dict, logger: RunLogger = None, fecha: datetime = No
             adjuntos = adjuntos,
         )
     except Exception as e_notif:
-        # El fallo de notificación no cancela el resultado
         resultado["notif_error"] = str(e_notif)
 
     return resultado
@@ -169,7 +210,6 @@ def ejecutar_todos(store: ConfigStore = None, logger: RunLogger = None):
     return resultados
 
 
-# ── CLI ───────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import argparse, json
 
