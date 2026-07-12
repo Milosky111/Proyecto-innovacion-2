@@ -10,8 +10,8 @@ import threading
 
 from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
                     SUCCESS, ERROR, WARNING, TEXT_DARK, TEXT_LIGHT,
-                    TEXT_MUTED, BORDER)
-from components import HoverButton
+                    TEXT_MUTED, BORDER, F)
+from components import HoverButton, Tooltip, AyudaInline
 from core.config_store import ConfigStore
 from core.logger       import RunLogger
 from core.runner       import ejecutar_perfil
@@ -56,25 +56,56 @@ class PanelAutomatizaciones(tk.Toplevel):
         toolbar = tk.Frame(self, bg=BG_SIDEBAR, pady=10)
         toolbar.pack(fill=tk.X)
 
-        tk.Label(toolbar, text="⚙  Automatizaciones", font=("Segoe UI", 14, "bold"),
+        tk.Label(toolbar, text="⚙  Automatizaciones", font=F(14, "bold"),
                  bg=BG_SIDEBAR, fg=TEXT_LIGHT).pack(side=tk.LEFT, padx=16)
+        AyudaInline(
+            toolbar,
+            "Una 'automatización' es una tarea programada: revisa una "
+            "carpeta, extrae datos de un Excel y los exporta solo, sin "
+            "que tengas que abrir la app cada vez. Aquí ves todas las "
+            "que has creado y su último resultado.",
+            bg=BG_SIDEBAR
+        ).pack(side=tk.LEFT, padx=(6, 0))
 
-        HoverButton(toolbar, bg_normal=SUCCESS, bg_hover="#176138",
-                    text="+ Nueva automatización", font=("Segoe UI", 10, "bold"),
+        btn_nueva = HoverButton(toolbar, bg_normal=SUCCESS, bg_hover="#176138",
+                    text="+ Nueva automatización", font=F(10, "bold"),
                     fg=TEXT_LIGHT, padx=14, pady=6,
-                    command=self._nueva).pack(side=tk.RIGHT, padx=12)
+                    command=self._nueva)
+        btn_nueva.pack(side=tk.RIGHT, padx=12)
+        Tooltip(btn_nueva,
+                "Crea un perfil nuevo: carpeta de origen, hoja, "
+                "horario y a dónde exportar. Se abre un formulario "
+                "para completarlo.")
 
-        HoverButton(toolbar, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
-                    text="📄  Informe de auditoría…", font=("Segoe UI", 10),
+        btn_informe = HoverButton(toolbar, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
+                    text="📄  Informe de auditoría…", font=F(10),
                     fg=ACCENT, padx=12, pady=6,
-                    command=self._exportar_informe).pack(side=tk.RIGHT, padx=(0, 8))
+                    command=self._exportar_informe)
+        btn_informe.pack(side=tk.RIGHT, padx=(0, 8))
+        Tooltip(btn_informe,
+                "Genera un PDF con el historial de ejecuciones de todas "
+                "las automatizaciones: qué corrió, cuándo y con qué "
+                "resultado.")
+
+        # Subtítulo explicativo, para que un usuario nuevo entienda de
+        # inmediato qué está viendo en la tabla de abajo.
+        sub = tk.Frame(self, bg=BG_MAIN)
+        sub.pack(fill=tk.X)
+        tk.Label(
+            sub,
+            text="Cada fila es una automatización configurada. Selecciona "
+                 "una y usa los botones de abajo para editarla, probarla "
+                 "o eliminarla.",
+            font=F(9, "italic"), bg=BG_MAIN, fg=TEXT_MUTED,
+            anchor="w", padx=16, pady=(8, 0)
+        ).pack(fill=tk.X)
 
         # Banner de alertas — avisa de fallos recientes sin que el usuario
         # tenga que leer toda la tabla para darse cuenta.
         self.banner = tk.Frame(self, bg=BG_MAIN)
         self.banner.pack(fill=tk.X)
         self.lbl_banner = tk.Label(
-            self.banner, text="", font=("Segoe UI", 10, "bold"),
+            self.banner, text="", font=F(10, "bold"),
             bg=BG_MAIN, fg=TEXT_DARK, anchor="w", padx=16, pady=8
         )
         self.lbl_banner.pack(fill=tk.X)
@@ -102,6 +133,12 @@ class PanelAutomatizaciones(tk.Toplevel):
         self.tree.configure(yscrollcommand=sb.set)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         sb.pack(side=tk.RIGHT, fill=tk.Y)
+        Tooltip(self.tree,
+                "Estado: ✔ OK = la última ejecución exportó datos bien · "
+                "⚠ Sin archivo = no encontró el Excel esperado · "
+                "✖ Error = falló al ejecutarse · "
+                "— Sin ejecutar = aún no ha corrido nunca.",
+                wraplength=320)
 
         self.tree.tag_configure("ok",          foreground=ESTADO_COLOR["ok"])
         self.tree.tag_configure("error",        foreground=ESTADO_COLOR["error"])
@@ -112,27 +149,44 @@ class PanelAutomatizaciones(tk.Toplevel):
         btn_frame = tk.Frame(self, bg=BG_MAIN)
         btn_frame.pack(fill=tk.X, padx=16, pady=(0, 14))
 
-        HoverButton(btn_frame, bg_normal=ACCENT, bg_hover=ACCENT_HOVER,
-                    text="✏  Editar", font=("Segoe UI", 10),
+        btn_editar = HoverButton(btn_frame, bg_normal=ACCENT, bg_hover=ACCENT_HOVER,
+                    text="✏  Editar", font=F(10),
                     fg=TEXT_LIGHT, padx=14, pady=7,
-                    command=self._editar).pack(side=tk.LEFT, padx=(0, 8))
+                    command=self._editar)
+        btn_editar.pack(side=tk.LEFT, padx=(0, 8))
+        Tooltip(btn_editar,
+                "Abre el formulario de la automatización seleccionada "
+                "para cambiar su carpeta, hoja, horario u otros datos.")
 
-        HoverButton(btn_frame, bg_normal="#1E8449", bg_hover="#176138",
-                    text="▶  Ejecutar ahora", font=("Segoe UI", 10),
+        btn_ejecutar = HoverButton(btn_frame, bg_normal="#1E8449", bg_hover="#176138",
+                    text="▶  Ejecutar ahora", font=F(10),
                     fg=TEXT_LIGHT, padx=14, pady=7,
-                    command=self._ejecutar_ahora).pack(side=tk.LEFT, padx=(0, 8))
+                    command=self._ejecutar_ahora)
+        btn_ejecutar.pack(side=tk.LEFT, padx=(0, 8))
+        Tooltip(btn_ejecutar,
+                "Corre la automatización seleccionada de inmediato, sin "
+                "esperar a su horario programado. Útil para probar que "
+                "todo funciona bien.")
 
-        HoverButton(btn_frame, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
-                    text="🗑  Eliminar", font=("Segoe UI", 10),
+        btn_eliminar = HoverButton(btn_frame, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
+                    text="🗑  Eliminar", font=F(10),
                     fg=ERROR, padx=14, pady=7,
-                    command=self._eliminar).pack(side=tk.LEFT, padx=(0, 8))
+                    command=self._eliminar)
+        btn_eliminar.pack(side=tk.LEFT, padx=(0, 8))
+        Tooltip(btn_eliminar,
+                "Borra la automatización seleccionada y desactiva su "
+                "tarea programada. Pedirá confirmación antes de borrar.")
 
-        HoverButton(btn_frame, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
-                    text="↺  Actualizar", font=("Segoe UI", 10),
+        btn_actualizar = HoverButton(btn_frame, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
+                    text="↺  Actualizar", font=F(10),
                     fg=TEXT_MUTED, padx=14, pady=7,
-                    command=self.actualizar_lista).pack(side=tk.RIGHT)
+                    command=self.actualizar_lista)
+        btn_actualizar.pack(side=tk.RIGHT)
+        Tooltip(btn_actualizar,
+                "Refresca la tabla con el estado más reciente de cada "
+                "automatización.")
 
-        self.lbl_status = tk.Label(self, text="", font=("Segoe UI", 9),
+        self.lbl_status = tk.Label(self, text="", font=F(9),
                                     bg=BG_MAIN, fg=TEXT_MUTED)
         self.lbl_status.pack(pady=(0, 8))
 

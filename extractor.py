@@ -9,8 +9,9 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from config import BG_MAIN, ACCENT, TEXT_LIGHT, TEXT_DARK, TEXT_MUTED, SUCCESS
-from components import HoverButton, RenameDialog
+from config import (BG_MAIN, BG_CARD, ACCENT, TEXT_LIGHT, TEXT_DARK,
+                     TEXT_MUTED, SUCCESS, F)
+from components import HoverButton, RenameDialog, aplicar_estilo_ttk
 from core.excel_reader  import ExcelReader
 from core.config_store  import ConfigStore
 from core.logger        import RunLogger
@@ -57,7 +58,42 @@ class ExtractorApp:
         m_auto.add_command(label="Nueva automatización…",
                             command=self._nueva_automatizacion)
         menubar.add_cascade(label="Automatizaciones", menu=m_auto)
+
+        m_ayuda = tk.Menu(menubar, tearoff=0)
+        m_ayuda.add_command(label="¿Cómo funciona esta app?",
+                             command=self._mostrar_ayuda)
+        menubar.add_cascade(label="Ayuda", menu=m_ayuda)
+
         self.root.config(menu=menubar)
+
+    def _mostrar_ayuda(self):
+        messagebox.showinfo(
+            "¿Cómo funciona esta app?",
+            "Extractor de Datos Excel te permite tomar cualquier archivo "
+            "Excel, quedarte solo con los datos que necesitas y guardarlos "
+            "en un nuevo archivo limpio.\n\n"
+            "PASOS EN LA VENTANA PRINCIPAL\n"
+            "1. Cargar archivo — elige tu Excel (.xlsx o .xls).\n"
+            "2. Elegir hoja — si el archivo tiene varias hojas, "
+            "escoges con cuál trabajar.\n"
+            "3. Seleccionar columnas — marca columnas completas, o "
+            "cambia a 'Rangos de celdas' para elegir un área exacta "
+            "(ej. B3:H30) por hoja.\n"
+            "4. Exportar — genera el Excel final con lo elegido.\n\n"
+            "MENÚ RANGOS\n"
+            "'Definir rangos de celdas…' abre un configurador avanzado "
+            "hoja por hoja, con vista previa y opción de marcar el "
+            "área con el mouse. 'Ver rangos configurados' muestra un "
+            "resumen de lo ya definido.\n\n"
+            "MENÚ AUTOMATIZACIONES\n"
+            "Permite programar extracciones que se repiten solas "
+            "(por ejemplo, todos los días a las 7:00 AM) sin que "
+            "tengas que abrir la app manualmente, y enviarte un "
+            "correo con el resultado.\n\n"
+            "Sugerencia: deja el mouse quieto sobre cualquier botón o "
+            "campo de la app para ver una explicación breve.",
+            parent=self.root
+        )
 
     def _abrir_selector_rangos(self):
         if not self.reader.ruta_archivo:
@@ -74,8 +110,7 @@ class ExtractorApp:
             self._set_estado(
                 f"{n} hoja{'s' if n != 1 else ''} con rango configurado", "ok")
             # Cambiar automáticamente a modo rangos y actualizar panel
-            self.ui.var_modo.set("rangos")
-            self._cambiar_modo()
+            self.ui._seleccionar_modo("rangos")
 
     def _ver_rangos(self):
         cfg = getattr(self, "_rangos_config", {})
@@ -118,11 +153,10 @@ class ExtractorApp:
             if i + 1 <= paso:
                 badge.config(bg="#5DCA8A")
                 lbl.config(fg=TEXT_LIGHT,
-                           font=("Segoe UI", 10,
-                                 "bold" if i + 1 == paso else "normal"))
+                           font=F(10, "bold" if i + 1 == paso else "normal"))
             else:
                 badge.config(bg=ACCENT)
-                lbl.config(fg="#A8C4E0", font=("Segoe UI", 10))
+                lbl.config(fg="#A8C4E0", font=F(10))
 
     # ── Selección de columnas ─────────────────────────────────────────────────
 
@@ -172,7 +206,7 @@ class ExtractorApp:
 
         self.ui.lbl_archivo.config(
             text=os.path.basename(ruta), fg=TEXT_DARK,
-            font=("Segoe UI", 10, "bold")
+            font=F(10, "bold")
         )
         self._set_estado("Leyendo hojas…", "info")
         self.root.update()
@@ -289,7 +323,7 @@ class ExtractorApp:
 
             self.ui.lbl_filas.config(
                 text=f"✔ {n_filas} filas exportadas",
-                fg=SUCCESS, font=("Segoe UI", 9, "bold"))
+                fg=SUCCESS, font=F(9, "bold"))
             self._activar_paso(4)
             self._set_estado(f"Exportado\n{n_filas} filas ✔", "ok")
             messagebox.showinfo(
@@ -326,7 +360,7 @@ class ExtractorApp:
 
             self.ui.lbl_filas.config(
                 text=f"✔ {n_filas} filas exportadas",
-                fg=SUCCESS, font=("Segoe UI", 9, "bold")
+                fg=SUCCESS, font=F(9, "bold")
             )
             self._activar_paso(4)
             self._set_estado(f"Exportado\n{n_filas} filas ✔", "ok")
@@ -385,20 +419,25 @@ class ExtractorApp:
             row = tk.Frame(self.ui.frame_rangos_lista, bg=BG_CARD)
             row.pack(fill=tk.X, pady=2)
             tk.Label(row, text=f"  • {hoja}",
-                     font=("Segoe UI", 10, "bold"),
+                     font=F(10, "bold"),
                      bg=BG_CARD, fg=TEXT_DARK,
                      width=22, anchor="w").pack(side=tk.LEFT)
             tk.Label(row, text=datos.get("rango", ""),
-                     font=("Segoe UI", 10),
+                     font=F(10),
                      bg=BG_CARD, fg=ACCENT).pack(side=tk.LEFT, padx=(0, 12))
             ren = len(datos.get("rename_map", {}))
             if ren:
                 tk.Label(row, text=f"{ren} cols renombradas",
-                         font=("Segoe UI", 9, "italic"),
+                         font=F(9, "italic"),
                          bg=BG_CARD, fg=TEXT_MUTED).pack(side=tk.LEFT)
 
 
 if __name__ == "__main__":
     root = tk.Tk()
-    app  = ExtractorApp(root)
+    # Aplica un tema ttk (Combobox, Treeview, Scrollbar…) que se ve igual en
+    # Windows y en macOS — sin esto, cada sistema operativo dibuja esos
+    # controles con su propio estilo nativo y la app luce distinta según
+    # el equipo. Debe llamarse una sola vez, antes de construir la interfaz.
+    aplicar_estilo_ttk(root)
+    app = ExtractorApp(root)
     root.mainloop()

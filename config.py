@@ -1,4 +1,33 @@
 # config.py
+import platform
+
+# ─── Tipografía multiplataforma ───────────────────────────────────────────────
+# "Segoe UI" solo existe en Windows. Si se usa tal cual en macOS o Linux,
+# Tk la reemplaza por una fuente por defecto con métricas distintas y la
+# interfaz se ve distinta (textos más anchos/angostos, botones que no
+# coinciden, etc). Por eso elegimos la fuente según el sistema operativo:
+# el resultado visual (tamaños, negritas, cursivas) queda equivalente en
+# Windows y en Mac.
+_SISTEMA = platform.system()
+if _SISTEMA == "Windows":
+    FONT_FAMILY = "Segoe UI"
+elif _SISTEMA == "Darwin":       # macOS
+    FONT_FAMILY = "Helvetica Neue"
+else:                             # Linux / otros
+    FONT_FAMILY = "DejaVu Sans"
+
+
+def F(size, *estilos):
+    """
+    Atajo para construir tuplas de fuente consistentes en toda la app.
+    Uso:  F(10)                -> (FONT_FAMILY, 10)
+          F(10, "bold")        -> (FONT_FAMILY, 10, "bold")
+          F(9, "bold","italic")-> (FONT_FAMILY, 9, "bold italic")
+    """
+    if not estilos:
+        return (FONT_FAMILY, size)
+    return (FONT_FAMILY, size, " ".join(estilos))
+
 
 # ─── Paleta de colores ────────────────────────────────────────────────────────
 BG_MAIN      = "#F0F4F8"

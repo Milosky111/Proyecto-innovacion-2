@@ -10,8 +10,8 @@ from tkinter import ttk, filedialog, messagebox
 
 from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
                     SUCCESS, ERROR, TEXT_DARK, TEXT_LIGHT, TEXT_MUTED, BORDER,
-                    FORMATOS_DESTINO)
-from components import HoverButton
+                    FORMATOS_DESTINO, F)
+from components import HoverButton, Tooltip, AyudaInline, crear_entry
 from core.config_store import ConfigStore
 from core.excel_reader  import ExcelReader
 from core.scheduler     import registrar_tarea, eliminar_tarea
@@ -41,7 +41,7 @@ class FormPerfil(tk.Toplevel):
         # Header
         tk.Frame(self, bg=BG_SIDEBAR, height=48).pack(fill=tk.X)
         tk.Label(self, text="Configurar automatización",
-                 font=("Segoe UI", 13, "bold"),
+                 font=F(13, "bold"),
                  bg=BG_SIDEBAR, fg=TEXT_LIGHT).place(x=16, y=12)
 
         # Scroll container
@@ -61,81 +61,184 @@ class FormPerfil(tk.Toplevel):
 
         pad = {"padx": 20, "pady": 6}
 
+        tk.Label(
+            self.scroll_frame,
+            text="Esta automatización revisará periódicamente una carpeta, "
+                 "extraerá datos del Excel más reciente que encuentre y los "
+                 "exportará sola, sin que tengas que abrir la app. Completa "
+                 "las secciones de abajo — pasa el mouse sobre cada campo "
+                 "si tienes dudas de qué escribir.",
+            font=F(9, "italic"), bg=BG_MAIN, fg=TEXT_MUTED,
+            wraplength=600, justify="left"
+        ).pack(anchor="w", padx=20, pady=(14, 0))
+
         # ── Sección: Identificación ────────────────────────────────────────
         self._seccion("Identificación")
-        self._campo("nombre",  "Nombre del perfil",  "Ej: Cierre TGM Coquimbo", **pad)
+        self._campo("nombre",  "Nombre del perfil",  "Ej: Cierre TGM Coquimbo",
+                    ayuda="Un nombre para identificar esta automatización en "
+                          "la lista (ej: 'Cierre TGM Coquimbo').", **pad)
 
         # ── Sección: Origen ────────────────────────────────────────────────
-        self._seccion("Archivo de origen")
-        self._campo_carpeta("carpeta_origen", "Carpeta de planillas", **pad)
-        self._campo("patron_archivo", "Patrón de nombre",
-                    "Ej: cierre_tgm_{YYYYMM}.xlsx  |  tokens: {YYYYMM} {YYYY} {MM}", **pad)
-        self._campo_hoja(**pad)
-        self._campo("rangos", "Rangos de celdas",
-                    "Ej: B3:H30,J3:J30  — vacío = columnas completas", **pad)
+        self._seccion(
+            "Archivo de origen",
+            ayuda="De dónde se leen los datos: la carpeta donde se guardan "
+                  "las planillas, cómo se llaman y qué hoja/rango usar."
+        )
+        self._campo_carpeta(
+            "carpeta_origen", "Carpeta de planillas", **pad,
+            ayuda="Carpeta donde se guarda el Excel que quieres procesar."
+        )
+        self._campo(
+            "patron_archivo", "Patrón de nombre",
+            "Ej: cierre_tgm_{YYYYMM}.xlsx  |  tokens: {YYYYMM} {YYYY} {MM}",
+            ayuda="Cómo se llama el archivo dentro de esa carpeta. Usa "
+                  "{YYYYMM}, {YYYY} o {MM} donde el nombre cambie cada mes "
+                  "(ej: cierre_tgm_{YYYYMM}.xlsx encuentra "
+                  "cierre_tgm_202607.xlsx en julio 2026).",
+            **pad
+        )
+        self._campo_hoja(
+            **pad,
+            ayuda="Hoja del Excel que contiene los datos a extraer. Usa "
+                  "'Detectar' para leerlas desde un archivo real."
+        )
+        self._campo(
+            "rangos", "Rangos de celdas",
+            "Ej: B3:H30,J3:J30  — vacío = columnas completas",
+            ayuda="Opcional. Si quieres extraer solo un área exacta de la "
+                  "hoja, escribe uno o más rangos separados por coma "
+                  "(notación Excel, ej: B3:H30). Déjalo vacío para tomar "
+                  "todas las columnas de la hoja.",
+            **pad
+        )
 
         # ── Sección: Destino ───────────────────────────────────────────────
-        self._seccion("Destino")
-        self._campo_carpeta("carpeta_destino", "Carpeta de exportación", **pad)
-        self._campo("nombre_archivo", "Nombre del archivo de salida",
-                    "Sin extensión — se agrega automáticamente", **pad)
-        self._campo_combo("tipo_destino",  "Formato",     FORMATOS_DESTINO, **pad)
-        self._campo_combo("modo_destino",  "Modo",
-                          ["append (acumula)", "replace (sobreescribe)"], **pad)
+        self._seccion(
+            "Destino",
+            ayuda="Dónde y en qué formato se guarda el resultado cada vez "
+                  "que corre la automatización."
+        )
+        self._campo_carpeta(
+            "carpeta_destino", "Carpeta de exportación", **pad,
+            ayuda="Carpeta donde se guardará el archivo con los datos "
+                  "extraídos."
+        )
+        self._campo(
+            "nombre_archivo", "Nombre del archivo de salida",
+            "Sin extensión — se agrega automáticamente",
+            ayuda="Nombre del archivo final, sin extensión (ej: "
+                  "'reporte_cierre'). La extensión (.csv, .xlsx, .db) se "
+                  "agrega sola según el formato elegido abajo.",
+            **pad
+        )
+        self._campo_combo(
+            "tipo_destino",  "Formato", FORMATOS_DESTINO, **pad,
+            ayuda="Formato del archivo de salida: csv (texto plano), "
+                  "xlsx (Excel) o sqlite (base de datos)."
+        )
+        self._campo_combo(
+            "modo_destino",  "Modo",
+            ["append (acumula)", "replace (sobreescribe)"], **pad,
+            ayuda="'append' agrega los datos nuevos a los ya exportados "
+                  "antes; 'replace' reemplaza el archivo completo cada vez."
+        )
 
         # ── Sección: Horario ───────────────────────────────────────────────
-        self._seccion("Horario de ejecución")
-        self._campo("hora_ejecucion", "Hora diaria (HH:MM)", "07:00", **pad)
-        self._campo_check("activo", "Activar automatización diaria", **pad)
+        self._seccion(
+            "Horario de ejecución",
+            ayuda="Cuándo debe correr esta automatización sola, cada día."
+        )
+        self._campo(
+            "hora_ejecucion", "Hora diaria (HH:MM)", "07:00",
+            ayuda="Hora del día en que se ejecutará automáticamente "
+                  "(formato 24 horas, ej: 07:00).",
+            **pad
+        )
+        self._campo_check(
+            "activo", "Activar automatización diaria", **pad,
+            ayuda="Si está marcada, se programa una tarea del sistema "
+                  "para correr esto sola todos los días a la hora indicada."
+        )
 
         # ── Sección: Notificación ──────────────────────────────────────────
-        self._seccion("Notificación por email")
-        self._campo("email_destino",  "Email destinatario",   "usuario@empresa.cl", **pad)
-        self._campo("smtp_host",      "Servidor SMTP",        "smtp.gmail.com", **pad)
-        self._campo("smtp_port",      "Puerto SMTP",          "587", **pad)
-        self._campo("smtp_user",      "Usuario SMTP",         "", **pad)
-        self._campo("smtp_pass",      "Contraseña SMTP",      "", show="*", **pad)
-        self._campo_check("notif_error",  "Notificar en error / archivo no encontrado", **pad)
-        self._campo_check("notif_exito",  "Notificar en éxito", **pad)
+        self._seccion(
+            "Notificación por email",
+            ayuda="Opcional: recibe un correo automático avisando si la "
+                  "ejecución salió bien o falló."
+        )
+        self._campo("email_destino",  "Email destinatario",   "usuario@empresa.cl",
+                    ayuda="A qué correo se envía el aviso de resultado.", **pad)
+        self._campo("smtp_host",      "Servidor SMTP",        "smtp.gmail.com",
+                    ayuda="Servidor de correo saliente de tu proveedor "
+                          "(ej: smtp.gmail.com para Gmail).", **pad)
+        self._campo("smtp_port",      "Puerto SMTP",          "587",
+                    ayuda="Puerto del servidor SMTP. 587 es el más común.", **pad)
+        self._campo("smtp_user",      "Usuario SMTP",         "",
+                    ayuda="Cuenta de correo que envía la notificación.", **pad)
+        self._campo("smtp_pass",      "Contraseña SMTP",      "", show="*",
+                    ayuda="Contraseña (o clave de aplicación) de esa cuenta "
+                          "de correo. Se guarda solo en este equipo.", **pad)
+        self._campo_check("notif_error",  "Notificar en error / archivo no encontrado",
+                           ayuda="Envía un correo cuando la automatización "
+                                 "falla o no encuentra el archivo esperado.",
+                           **pad)
+        self._campo_check("notif_exito",  "Notificar en éxito",
+                           ayuda="Envía también un correo cuando todo sale "
+                                 "bien, no solo cuando hay error.",
+                           **pad)
 
         # ── Botones ────────────────────────────────────────────────────────
         btn_frame = tk.Frame(self, bg=BG_MAIN, pady=12)
         btn_frame.pack(fill=tk.X)
 
-        HoverButton(btn_frame, bg_normal=SUCCESS, bg_hover="#176138",
-                    text="Guardar", font=("Segoe UI", 11, "bold"),
+        btn_guardar = HoverButton(btn_frame, bg_normal=SUCCESS, bg_hover="#176138",
+                    text="Guardar", font=F(11, "bold"),
                     fg=TEXT_LIGHT, padx=20, pady=8,
-                    command=self._guardar).pack(side=tk.LEFT, padx=(20, 8))
+                    command=self._guardar)
+        btn_guardar.pack(side=tk.LEFT, padx=(20, 8))
+        Tooltip(btn_guardar,
+                "Guarda esta configuración. Si 'Activar automatización "
+                "diaria' está marcada, también programa la tarea diaria.")
 
-        HoverButton(btn_frame, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
-                    text="Cancelar", font=("Segoe UI", 10),
+        btn_cancelar = HoverButton(btn_frame, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
+                    text="Cancelar", font=F(10),
                     fg=TEXT_DARK, padx=16, pady=8,
-                    command=self.destroy).pack(side=tk.LEFT)
+                    command=self.destroy)
+        btn_cancelar.pack(side=tk.LEFT)
+        Tooltip(btn_cancelar, "Cierra sin guardar los cambios de este formulario.")
 
-        HoverButton(btn_frame, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
-                    text="▶ Probar ahora", font=("Segoe UI", 10),
+        btn_probar = HoverButton(btn_frame, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
+                    text="▶ Probar ahora", font=F(10),
                     fg=ACCENT, padx=16, pady=8,
-                    command=self._probar).pack(side=tk.RIGHT, padx=20)
+                    command=self._probar)
+        btn_probar.pack(side=tk.RIGHT, padx=20)
+        Tooltip(btn_probar,
+                "Guarda y ejecuta esta automatización de inmediato, para "
+                "comprobar que la carpeta, hoja y destino están bien "
+                "configurados antes de dejarla corriendo sola.")
 
     # ── Widgets helper ────────────────────────────────────────────────────────
 
-    def _seccion(self, titulo):
+    def _seccion(self, titulo, ayuda=None):
         f = tk.Frame(self.scroll_frame, bg=ACCENT, height=2)
         f.pack(fill=tk.X, padx=20, pady=(14, 0))
-        tk.Label(self.scroll_frame, text=titulo,
-                 font=("Segoe UI", 10, "bold"),
-                 bg=BG_MAIN, fg=ACCENT).pack(anchor="w", padx=20, pady=(4, 0))
+        row = tk.Frame(self.scroll_frame, bg=BG_MAIN)
+        row.pack(fill=tk.X, padx=20, pady=(4, 0))
+        tk.Label(row, text=titulo, font=F(10, "bold"),
+                 bg=BG_MAIN, fg=ACCENT).pack(side=tk.LEFT, anchor="w")
+        if ayuda:
+            AyudaInline(row, ayuda, bg=BG_MAIN).pack(side=tk.LEFT, padx=(6, 0))
 
-    def _campo(self, key, label, placeholder="", show="", **kw):
+    def _campo(self, key, label, placeholder="", show="", ayuda=None, **kw):
         row = tk.Frame(self.scroll_frame, bg=BG_MAIN)
         row.pack(fill=tk.X, **kw)
         tk.Label(row, text=label, width=32, anchor="w",
-                 font=("Segoe UI", 9), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT)
+                 font=F(9), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT)
         var = tk.StringVar()
-        entry = tk.Entry(row, textvariable=var, font=("Segoe UI", 10),
-                         width=36, relief="solid", bd=1, show=show,
-                         highlightcolor=ACCENT, highlightthickness=1)
+        entry = crear_entry(row, textvariable=var, font=F(10), width=36, show=show)
         entry.pack(side=tk.LEFT, padx=(8, 0))
+        if ayuda:
+            Tooltip(entry, ayuda)
         if placeholder:
             entry.insert(0, placeholder)
             entry.config(fg=TEXT_MUTED)
@@ -151,52 +254,66 @@ class FormPerfil(tk.Toplevel):
             entry.bind("<FocusOut>", _on_focus_out)
         self._vars[key] = var
 
-    def _campo_carpeta(self, key, label, **kw):
+    def _campo_carpeta(self, key, label, ayuda=None, **kw):
         row = tk.Frame(self.scroll_frame, bg=BG_MAIN)
         row.pack(fill=tk.X, **kw)
         tk.Label(row, text=label, width=32, anchor="w",
-                 font=("Segoe UI", 9), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT)
+                 font=F(9), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT)
         var = tk.StringVar()
-        tk.Entry(row, textvariable=var, font=("Segoe UI", 10),
-                 width=28, relief="solid", bd=1).pack(side=tk.LEFT, padx=(8, 4))
-        HoverButton(row, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
-                    text="…", font=("Segoe UI", 10), fg=ACCENT, padx=6, pady=2,
+        entry = crear_entry(row, textvariable=var, font=F(10), width=28)
+        entry.pack(side=tk.LEFT, padx=(8, 4))
+        if ayuda:
+            Tooltip(entry, ayuda)
+        btn = HoverButton(row, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
+                    text="…", font=F(10), fg=ACCENT, padx=6, pady=2,
                     command=lambda v=var: v.set(
                         filedialog.askdirectory(parent=self) or v.get()
-                    )).pack(side=tk.LEFT)
+                    ))
+        btn.pack(side=tk.LEFT)
+        Tooltip(btn, "Abre el explorador de archivos para elegir la carpeta.")
         self._vars[key] = var
 
-    def _campo_combo(self, key, label, opciones, **kw):
+    def _campo_combo(self, key, label, opciones, ayuda=None, **kw):
         row = tk.Frame(self.scroll_frame, bg=BG_MAIN)
         row.pack(fill=tk.X, **kw)
         tk.Label(row, text=label, width=32, anchor="w",
-                 font=("Segoe UI", 9), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT)
+                 font=F(9), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT)
         var = tk.StringVar(value=opciones[0])
-        ttk.Combobox(row, textvariable=var, values=opciones,
-                     state="readonly", width=34).pack(side=tk.LEFT, padx=(8, 0))
+        combo = ttk.Combobox(row, textvariable=var, values=opciones,
+                     state="readonly", width=34)
+        combo.pack(side=tk.LEFT, padx=(8, 0))
+        if ayuda:
+            Tooltip(combo, ayuda)
         self._vars[key] = var
 
-    def _campo_check(self, key, label, **kw):
+    def _campo_check(self, key, label, ayuda=None, **kw):
         var = tk.BooleanVar()
-        tk.Checkbutton(self.scroll_frame, text=label, variable=var,
-                       font=("Segoe UI", 10), bg=BG_MAIN, fg=TEXT_DARK,
-                       activebackground=BG_MAIN, selectcolor=BG_MAIN,
-                       cursor="hand2").pack(anchor="w", **kw)
+        chk = ttk.Checkbutton(self.scroll_frame, text=label, variable=var,
+                               style="Main.TCheckbutton", cursor="hand2")
+        chk.pack(anchor="w", **kw)
+        if ayuda:
+            Tooltip(chk, ayuda)
         self._vars[key] = var
 
-    def _campo_hoja(self, **kw):
+    def _campo_hoja(self, ayuda=None, **kw):
         """Combo de hojas con botón para detectarlas automáticamente."""
         row = tk.Frame(self.scroll_frame, bg=BG_MAIN)
         row.pack(fill=tk.X, **kw)
         tk.Label(row, text="Hoja de trabajo", width=32, anchor="w",
-                 font=("Segoe UI", 9), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT)
+                 font=F(9), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT)
         var = tk.StringVar()
         self._combo_hoja = ttk.Combobox(row, textvariable=var,
                                          state="readonly", width=28)
         self._combo_hoja.pack(side=tk.LEFT, padx=(8, 4))
-        HoverButton(row, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
-                    text="Detectar", font=("Segoe UI", 9), fg=ACCENT, padx=8, pady=2,
-                    command=self._detectar_hojas).pack(side=tk.LEFT)
+        if ayuda:
+            Tooltip(self._combo_hoja, ayuda)
+        btn_detectar = HoverButton(row, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
+                    text="Detectar", font=F(9), fg=ACCENT, padx=8, pady=2,
+                    command=self._detectar_hojas)
+        btn_detectar.pack(side=tk.LEFT)
+        Tooltip(btn_detectar,
+                "Abre el archivo más reciente que calce con el patrón de "
+                "nombre de arriba y lista sus hojas disponibles.")
         self._vars["hoja"] = var
 
     # ── Cargar / Guardar ──────────────────────────────────────────────────────
