@@ -10,8 +10,8 @@ en self.result, en el mismo formato que ya usa el modo texto.
 import tkinter as tk
 from tkinter import messagebox
 
-from config import BG_MAIN, BG_CARD, ACCENT, ACCENT_HOVER, SUCCESS, ERROR, TEXT_LIGHT, TEXT_DARK, TEXT_MUTED, BORDER
-from components import HoverButton
+from config import BG_MAIN, BG_CARD, ACCENT, ACCENT_HOVER, SUCCESS, ERROR, TEXT_LIGHT, TEXT_DARK, TEXT_MUTED, BORDER, F
+from components import HoverButton, Tooltip
 
 
 class ClickRangeSelector(tk.Toplevel):
@@ -63,24 +63,24 @@ class ClickRangeSelector(tk.Toplevel):
         header = tk.Frame(self, bg=BG_MAIN)
         header.pack(fill=tk.X, padx=20, pady=(16, 8))
         tk.Label(header, text="Marca el rango de datos",
-                 font=("Segoe UI", 13, "bold"),
+                 font=F(13, "bold"),
                  bg=BG_MAIN, fg=TEXT_DARK).pack(anchor="w")
         tk.Label(header,
                  text="Clic en la celda donde empieza la tabla, luego clic en la celda donde "
                       "termina. Ignora títulos o textos decorativos — marca solo la tabla real.",
-                 font=("Segoe UI", 9), bg=BG_MAIN, fg=TEXT_MUTED,
+                 font=F(9), bg=BG_MAIN, fg=TEXT_MUTED,
                  wraplength=820, justify="left").pack(anchor="w", pady=(2, 0))
 
         self.lbl_rango_actual = tk.Label(
             header, text="Rango: (sin seleccionar)",
-            font=("Segoe UI", 11, "bold"), bg=BG_MAIN, fg=SUCCESS
+            font=F(11, "bold"), bg=BG_MAIN, fg=SUCCESS
         )
         self.lbl_rango_actual.pack(anchor="w", pady=(8, 0))
 
         if self.n_filas == 0 or self.n_cols == 0:
             tk.Label(
                 self, text="⚠ No se encontraron datos en esta hoja para mostrar.",
-                font=("Segoe UI", 11, "bold"), bg=BG_MAIN, fg=ERROR
+                font=F(11, "bold"), bg=BG_MAIN, fg=ERROR
             ).pack(pady=40)
             self.canvas = None
         else:
@@ -90,15 +90,21 @@ class ClickRangeSelector(tk.Toplevel):
         btn_row = tk.Frame(self, bg=BG_MAIN)
         btn_row.pack(pady=(0, 16))
 
-        HoverButton(btn_row, bg_normal=ACCENT, bg_hover=ACCENT_HOVER,
-                    text="Usar este rango", font=("Segoe UI", 10, "bold"),
+        btn_usar = HoverButton(btn_row, bg_normal=ACCENT, bg_hover=ACCENT_HOVER,
+                    text="Usar este rango", font=F(10, "bold"),
                     fg=TEXT_LIGHT, padx=18, pady=8,
-                    command=self._confirmar).pack(side=tk.LEFT, padx=(0, 10))
+                    command=self._confirmar)
+        btn_usar.pack(side=tk.LEFT, padx=(0, 10))
+        Tooltip(btn_usar,
+                "Confirma el rango marcado y lo copia al campo de texto "
+                "de la ventana anterior, lista para previsualizar.")
 
-        HoverButton(btn_row, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
-                    text="Cancelar", font=("Segoe UI", 10),
+        btn_cancelar = HoverButton(btn_row, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
+                    text="Cancelar", font=F(10),
                     fg=TEXT_DARK, padx=14, pady=8,
-                    command=self.destroy).pack(side=tk.LEFT)
+                    command=self.destroy)
+        btn_cancelar.pack(side=tk.LEFT)
+        Tooltip(btn_cancelar, "Cierra sin marcar ningún rango.")
 
     # ── Construcción de la grilla ─────────────────────────────────────────────
 
@@ -187,7 +193,7 @@ class ClickRangeSelector(tk.Toplevel):
                                 fill="#1F3864", outline="#16294A")
             c.create_text(x0 + ancho / 2, self.CELDA_ALTO / 2,
                            text=self._col_letra(col), fill="#FFFFFF",
-                           font=("Segoe UI", 9, "bold"))
+                           font=F(9, "bold"))
 
         # Esquina superior izquierda (sobre los encabezados de fila)
         c.create_rectangle(0, 0, self.COL_HEADER_ANCHO, self.CELDA_ALTO,
@@ -203,7 +209,7 @@ class ClickRangeSelector(tk.Toplevel):
                                 fill="#1F3864", outline="#16294A")
             c.create_text(self.COL_HEADER_ANCHO / 2, y0 + self.CELDA_ALTO / 2,
                            text=str(fila + 1), fill="#FFFFFF",
-                           font=("Segoe UI", 9, "bold"))
+                           font=F(9, "bold"))
 
             valores_fila = self.filas_preview[fila]
             for col in range(self.n_cols):
@@ -225,7 +231,7 @@ class ClickRangeSelector(tk.Toplevel):
                     texto_mostrado = texto if len(texto) <= max_chars else texto[:max_chars - 1] + "…"
                     c.create_text(
                         x0 + 6, y0 + self.CELDA_ALTO / 2, text=texto_mostrado,
-                        fill=self.TEXT_DATA_COLOR, font=("Segoe UI", 8), anchor="w"
+                        fill=self.TEXT_DATA_COLOR, font=F(8), anchor="w"
                     )
 
         # Línea de cierre a la derecha y abajo, para que la grilla no se

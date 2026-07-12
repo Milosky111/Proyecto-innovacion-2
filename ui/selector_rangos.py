@@ -23,8 +23,8 @@ from tkinter import ttk, messagebox
 
 from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
                     SUCCESS, ERROR, TEXT_DARK, TEXT_LIGHT, TEXT_MUTED,
-                    BORDER, ROW_EVEN, ROW_ODD)
-from components import HoverButton
+                    BORDER, ROW_EVEN, ROW_ODD, F)
+from components import HoverButton, Tooltip, AyudaInline, crear_entry, crear_spinbox
 from core.excel_reader import ExcelReader
 from ui.click_range_selector import ClickRangeSelector
 
@@ -77,52 +77,70 @@ class SelectorRangos(tk.Toplevel):
         bar = tk.Frame(self, bg=BG_MAIN, pady=10)
         bar.pack(fill=tk.X, side=tk.BOTTOM)
 
-        HoverButton(bar, bg_normal=SUCCESS, bg_hover="#176138",
+        btn_confirmar = HoverButton(bar, bg_normal=SUCCESS, bg_hover="#176138",
                     text="✔  Confirmar configuración",
-                    font=("Segoe UI", 11, "bold"),
+                    font=F(11, "bold"),
                     fg=TEXT_LIGHT, padx=20, pady=8,
-                    command=self._confirmar).pack(side=tk.RIGHT, padx=16)
+                    command=self._confirmar)
+        btn_confirmar.pack(side=tk.RIGHT, padx=16)
+        Tooltip(btn_confirmar,
+                "Cierra esta ventana y guarda los rangos configurados en "
+                "todas las hojas. La ventana principal quedará en modo "
+                "'Rangos de celdas' lista para exportar.")
 
-        HoverButton(bar, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
-                    text="Cancelar", font=("Segoe UI", 10),
+        btn_cancelar = HoverButton(bar, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
+                    text="Cancelar", font=F(10),
                     fg=TEXT_DARK, padx=14, pady=8,
-                    command=self.destroy).pack(side=tk.RIGHT, padx=(0, 8))
+                    command=self.destroy)
+        btn_cancelar.pack(side=tk.RIGHT, padx=(0, 8))
+        Tooltip(btn_cancelar, "Cierra sin guardar cambios en esta ventana.")
 
-        self.lbl_status = tk.Label(bar, text="", font=("Segoe UI", 9),
+        self.lbl_status = tk.Label(bar, text="", font=F(9),
                                     bg=BG_MAIN, fg=TEXT_MUTED)
         self.lbl_status.pack(side=tk.LEFT, padx=16)
 
     def _build_panel_hojas(self, parent):
         tk.Label(parent, text="Hojas del archivo",
-                 font=("Segoe UI", 10, "bold"),
+                 font=F(10, "bold"),
                  bg=BG_SIDEBAR, fg=TEXT_LIGHT,
                  pady=12).pack(fill=tk.X, padx=12)
+        tk.Label(parent,
+                 text="Configura el rango de\ncada hoja por separado.\n"
+                      "En verde: ya tiene rango.",
+                 font=F(8, "italic"), justify="left",
+                 bg=BG_SIDEBAR, fg="#A8C4E0").pack(fill=tk.X, padx=12, pady=(0, 10))
 
         self._btns_hoja = {}
         for hoja in self.hojas:
-            btn = tk.Button(
+            # Se usa tk.Label (no tk.Button) a propósito: en macOS, un
+            # tk.Button con fondo oscuro se dibuja igual con el botón
+            # gris nativo del sistema, lo que rompe el look de la barra
+            # lateral oscura. tk.Label sí respeta los colores en
+            # cualquier plataforma, y con un bind de clic funciona igual
+            # de bien como opción de lista.
+            btn = tk.Label(
                 parent, text=hoja,
-                font=("Segoe UI", 9), anchor="w",
+                font=F(9), anchor="w",
                 bg=BG_SIDEBAR, fg="#A8C4E0",
-                activebackground=ACCENT, activeforeground=TEXT_LIGHT,
-                relief="flat", cursor="hand2", padx=12, pady=6,
-                command=lambda h=hoja: self._seleccionar_hoja(h)
+                cursor="hand2", padx=12, pady=6
             )
+            btn.bind("<Button-1>", lambda e, h=hoja: self._seleccionar_hoja(h))
             btn.pack(fill=tk.X, padx=4, pady=1)
+            Tooltip(btn, f"Configurar el rango de celdas de la hoja '{hoja}'.")
             self._btns_hoja[hoja] = btn
 
     def _build_panel_config(self, parent):
         # Header de hoja seleccionada
         self.lbl_hoja_header = tk.Label(
             parent, text="Selecciona una hoja",
-            font=("Segoe UI", 13, "bold"),
+            font=F(13, "bold"),
             bg=BG_MAIN, fg=TEXT_DARK, anchor="w"
         )
         self.lbl_hoja_header.pack(fill=tk.X, padx=20, pady=(16, 2))
 
         self.lbl_hoja_sub = tk.Label(
             parent, text="Define el rango de celdas a extraer",
-            font=("Segoe UI", 9, "italic"),
+            font=F(9, "italic"),
             bg=BG_MAIN, fg=TEXT_MUTED, anchor="w"
         )
         self.lbl_hoja_sub.pack(fill=tk.X, padx=20, pady=(0, 12))
@@ -134,54 +152,68 @@ class SelectorRangos(tk.Toplevel):
         sec_rango.pack(fill=tk.X, padx=20, pady=(14, 0))
 
         tk.Label(sec_rango, text="Rango de celdas",
-                 font=("Segoe UI", 10, "bold"),
+                 font=F(10, "bold"),
                  bg=BG_MAIN, fg=TEXT_DARK).pack(anchor="w")
         tk.Label(sec_rango,
                  text="Notación Excel: B3:R35  —  incluye fila de encabezados",
-                 font=("Segoe UI", 8, "italic"),
+                 font=F(8, "italic"),
                  bg=BG_MAIN, fg=TEXT_MUTED).pack(anchor="w", pady=(2, 6))
 
         row_rango = tk.Frame(sec_rango, bg=BG_MAIN)
         row_rango.pack(fill=tk.X)
 
-        self.entry_rango = tk.Entry(
-            row_rango, font=("Segoe UI", 11), width=14,
-            relief="solid", bd=1,
-            highlightthickness=1, highlightcolor=ACCENT
-        )
+        self.entry_rango = crear_entry(row_rango, font=F(11), width=14)
         self.entry_rango.pack(side=tk.LEFT, ipady=4)
+        Tooltip(self.entry_rango,
+                "Escribe el rango en notación Excel, ej: B3:R35 "
+                "(columna+fila inicial : columna+fila final). También "
+                "puedes usar el botón 'Marcar con clic…' si prefieres "
+                "no escribirlo a mano.")
 
         tk.Label(row_rango, text="Encabezado en fila",
-                 font=("Segoe UI", 9), bg=BG_MAIN, fg=TEXT_MUTED
+                 font=F(9), bg=BG_MAIN, fg=TEXT_MUTED
                  ).pack(side=tk.LEFT, padx=(16, 4))
 
-        self._enc_spin = tk.Spinbox(
+        self._enc_spin = crear_spinbox(
             row_rango, from_=1, to=10,
-            textvariable=self._enc_var,
-            font=("Segoe UI", 10), width=4,
-            relief="solid", bd=1
+            textvariable=self._enc_var, width=4
         )
         self._enc_spin.pack(side=tk.LEFT)
+        Tooltip(self._enc_spin,
+                "¿En qué fila del rango están los nombres de columna? "
+                "1 = la primera fila del rango. Si tus datos empiezan "
+                "inmediatamente (sin encabezado), deja 1.")
 
         tk.Label(row_rango, text="del rango",
-                 font=("Segoe UI", 9), bg=BG_MAIN, fg=TEXT_MUTED
+                 font=F(9), bg=BG_MAIN, fg=TEXT_MUTED
                  ).pack(side=tk.LEFT, padx=(4, 0))
 
-        HoverButton(row_rango, bg_normal=ACCENT, bg_hover=ACCENT_HOVER,
+        btn_prev = HoverButton(row_rango, bg_normal=ACCENT, bg_hover=ACCENT_HOVER,
                     text="▶  Previsualizar",
-                    font=("Segoe UI", 10, "bold"),
+                    font=F(10, "bold"),
                     fg=TEXT_LIGHT, padx=14, pady=5,
-                    command=self._previsualizar).pack(side=tk.LEFT, padx=(16, 0))
+                    command=self._previsualizar)
+        btn_prev.pack(side=tk.LEFT, padx=(16, 0))
+        Tooltip(btn_prev,
+                "Lee el rango escrito y muestra abajo las primeras 5 "
+                "filas, para que confirmes que es el área correcta "
+                "antes de guardar.")
 
-        HoverButton(row_rango, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
+        btn_clic = HoverButton(row_rango, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
                     text="🖱  Marcar con clic…",
-                    font=("Segoe UI", 10, "bold"),
+                    font=F(10, "bold"),
                     fg=ACCENT, padx=14, pady=5,
-                    command=self._abrir_selector_clic).pack(side=tk.LEFT, padx=(8, 0))
+                    command=self._abrir_selector_clic)
+        btn_clic.pack(side=tk.LEFT, padx=(8, 0))
+        Tooltip(btn_clic,
+                "Alternativa a escribir el rango a mano: abre una "
+                "grilla con los datos reales de la hoja y marca el "
+                "área haciendo clic en la celda inicial y luego en "
+                "la celda final.")
 
         # ── Sección previsualización ───────────────────────────────────────
         tk.Label(parent, text="Previsualización (primeras 5 filas)",
-                 font=("Segoe UI", 10, "bold"),
+                 font=F(10, "bold"),
                  bg=BG_MAIN, fg=TEXT_DARK).pack(anchor="w", padx=20, pady=(14, 4))
 
         frame_prev = tk.Frame(parent, bg=BG_MAIN)
@@ -197,11 +229,11 @@ class SelectorRangos(tk.Toplevel):
 
         # ── Sección renombrado ─────────────────────────────────────────────
         tk.Label(parent, text="Renombrar columnas",
-                 font=("Segoe UI", 10, "bold"),
+                 font=F(10, "bold"),
                  bg=BG_MAIN, fg=TEXT_DARK).pack(anchor="w", padx=20, pady=(14, 2))
         tk.Label(parent,
                  text="Deja en blanco para mantener el nombre original del Excel.",
-                 font=("Segoe UI", 8, "italic"),
+                 font=F(8, "italic"),
                  bg=BG_MAIN, fg=TEXT_MUTED).pack(anchor="w", padx=20)
 
         # Frame scrollable para campos de renombrado
@@ -221,11 +253,16 @@ class SelectorRangos(tk.Toplevel):
         sb_r.pack(side=tk.RIGHT, fill=tk.Y)
 
         # Botón guardar rango
-        HoverButton(parent, bg_normal=SUCCESS, bg_hover="#176138",
+        btn_guardar = HoverButton(parent, bg_normal=SUCCESS, bg_hover="#176138",
                     text="💾  Guardar rango de esta hoja",
-                    font=("Segoe UI", 10, "bold"),
+                    font=F(10, "bold"),
                     fg=TEXT_LIGHT, padx=14, pady=7,
-                    command=self._guardar_rango_hoja).pack(anchor="e", padx=20, pady=10)
+                    command=self._guardar_rango_hoja)
+        btn_guardar.pack(anchor="e", padx=20, pady=10)
+        Tooltip(btn_guardar,
+                "Guarda el rango y los renombres definidos para ESTA "
+                "hoja. Repite el proceso para cada hoja que necesites "
+                "y luego presiona 'Confirmar configuración' abajo.")
 
     # ── Lógica ────────────────────────────────────────────────────────────────
 
@@ -262,13 +299,13 @@ class SelectorRangos(tk.Toplevel):
         # Resaltar botón activo
         for h, btn in self._btns_hoja.items():
             if h == hoja:
-                btn.config(bg=ACCENT, fg=TEXT_LIGHT, font=("Segoe UI", 9, "bold"))
+                btn.config(bg=ACCENT, fg=TEXT_LIGHT, font=F(9, "bold"))
             else:
                 tiene = hoja in self.resultado
                 btn.config(
                     bg=BG_SIDEBAR,
                     fg="#5DCA8A" if h in self.resultado else "#A8C4E0",
-                    font=("Segoe UI", 9)
+                    font=F(9)
                 )
 
         self._hoja_actual = hoja
@@ -338,22 +375,19 @@ class SelectorRangos(tk.Toplevel):
         hdr = tk.Frame(self._frame_rename, bg=BG_MAIN)
         hdr.pack(fill=tk.X, pady=(0, 4))
         tk.Label(hdr, text="Columna original", width=28, anchor="w",
-                 font=("Segoe UI", 9, "bold"), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT)
+                 font=F(9, "bold"), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT)
         tk.Label(hdr, text="→  Nuevo nombre (opcional)", anchor="w",
-                 font=("Segoe UI", 9, "bold"), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT, padx=(8, 0))
+                 font=F(9, "bold"), bg=BG_MAIN, fg=TEXT_MUTED).pack(side=tk.LEFT, padx=(8, 0))
 
         for col in cols:
             row_f = tk.Frame(self._frame_rename, bg=BG_MAIN)
             row_f.pack(fill=tk.X, pady=2)
 
             tk.Label(row_f, text=str(col)[:30], width=28, anchor="w",
-                     font=("Segoe UI", 9), bg=BG_MAIN, fg=TEXT_DARK).pack(side=tk.LEFT)
+                     font=F(9), bg=BG_MAIN, fg=TEXT_DARK).pack(side=tk.LEFT)
 
             var = tk.StringVar(value=rename_map.get(str(col), ""))
-            entry = tk.Entry(row_f, textvariable=var,
-                             font=("Segoe UI", 9), width=30,
-                             relief="solid", bd=1,
-                             highlightthickness=1, highlightcolor=ACCENT)
+            entry = crear_entry(row_f, textvariable=var, font=F(9), width=30)
             entry.pack(side=tk.LEFT, padx=(8, 0))
             self._rename_vars[str(col)] = var
 
