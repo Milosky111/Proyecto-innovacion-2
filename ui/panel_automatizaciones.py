@@ -11,7 +11,8 @@ import threading
 from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
                     SUCCESS, ERROR, WARNING, TEXT_DARK, TEXT_LIGHT,
                     TEXT_MUTED, BORDER, F)
-from components import HoverButton, Tooltip, AyudaInline
+from components import (HoverButton, Tooltip, AyudaInline, abrir_carpeta_de,
+                        recordar_carpeta, ultima_carpeta, explicar_error)
 from core.config_store import ConfigStore
 from core.logger       import RunLogger
 from core.runner       import ejecutar_perfil
@@ -128,17 +129,35 @@ class PanelAutomatizaciones(tk.Toplevel):
             self.tree.heading(col, text=titulos[col])
             self.tree.column(col, width=anchos[col], anchor="w")
 
-        sb = ttk.Scrollbar(frame_tabla, orient="vertical",
+        self.sb_tree = ttk.Scrollbar(frame_tabla, orient="vertical",
                             command=self.tree.yview)
-        self.tree.configure(yscrollcommand=sb.set)
+        self.tree.configure(yscrollcommand=self.sb_tree.set)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        self.sb_tree.pack(side=tk.RIGHT, fill=tk.Y)
         Tooltip(self.tree,
                 "Estado: ✔ OK = la última ejecución exportó datos bien · "
                 "⚠ Sin archivo = no encontró el Excel esperado · "
                 "✖ Error = falló al ejecutarse · "
                 "— Sin ejecutar = aún no ha corrido nunca.",
                 wraplength=320)
+
+        # Mensaje que se muestra en vez de la tabla cuando todavía no hay
+        # ninguna automatización creada, para que la pantalla no se vea
+        # como un error o un espacio vacío sin explicación.
+        self.frame_vacio = tk.Frame(frame_tabla, bg=BG_MAIN)
+        tk.Label(
+            self.frame_vacio, text="📭", font=F(28), bg=BG_MAIN
+        ).pack(pady=(30, 6))
+        tk.Label(
+            self.frame_vacio, text="Aún no tienes automatizaciones creadas",
+            font=F(11, "bold"), bg=BG_MAIN, fg=TEXT_DARK
+        ).pack()
+        tk.Label(
+            self.frame_vacio,
+            text="Usa el botón '+ Nueva automatización' de arriba para "
+                 "crear la primera.",
+            font=F(9), bg=BG_MAIN, fg=TEXT_MUTED
+        ).pack(pady=(2, 0))
 
         self.tree.tag_configure("ok",          foreground=ESTADO_COLOR["ok"])
         self.tree.tag_configure("error",        foreground=ESTADO_COLOR["error"])
@@ -197,6 +216,17 @@ class PanelAutomatizaciones(tk.Toplevel):
             self.tree.delete(item)
 
         perfiles = self.store.listar_perfiles()
+
+        if not perfiles:
+            self.tree.pack_forget()
+            self.sb_tree.pack_forget()
+            self.frame_vacio.pack(fill=tk.BOTH, expand=True)
+            self._actualizar_banner([], [], 0)
+            return
+        self.frame_vacio.pack_forget()
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.sb_tree.pack(side=tk.RIGHT, fill=tk.Y)
+
         fallidas, sin_archivo, ok = [], [], 0
 
         for p in perfiles:
@@ -259,19 +289,23 @@ class PanelAutomatizaciones(tk.Toplevel):
             defaultextension=".pdf",
             filetypes=[("Documento PDF", "*.pdf")],
             initialfile="informe_auditoria.pdf",
+            initialdir=ultima_carpeta(),
             parent=self
         )
         if not ruta:
             return
+        recordar_carpeta(ruta)
         try:
             generar_informe(self.logger, ruta)
-            messagebox.showinfo(
+            if messagebox.askyesno(
                 "Informe generado",
-                f"El informe de auditoría se guardó en:\n{ruta}",
+                f"El informe de auditoría se guardó en:\n{ruta}\n\n"
+                "¿Abrir la carpeta donde se guardó?",
                 parent=self
-            )
+            ):
+                abrir_carpeta_de(ruta)
         except Exception as e:
-            messagebox.showerror("Error al generar informe", str(e), parent=self)
+            messagebox.showerror("Error al generar informe", explicar_error(e), parent=self)
 
     def _get_seleccionado_id(self):
         sel = self.tree.selection()

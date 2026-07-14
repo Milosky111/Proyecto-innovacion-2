@@ -24,7 +24,7 @@ from tkinter import ttk, messagebox
 from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
                     SUCCESS, ERROR, TEXT_DARK, TEXT_LIGHT, TEXT_MUTED,
                     BORDER, ROW_EVEN, ROW_ODD, F)
-from components import HoverButton, Tooltip, AyudaInline, crear_entry, crear_spinbox
+from components import HoverButton, Tooltip, AyudaInline, crear_entry, crear_spinbox, explicar_error
 from core.excel_reader import ExcelReader
 from ui.click_range_selector import ClickRangeSelector
 
@@ -47,6 +47,12 @@ class SelectorRangos(tk.Toplevel):
         self.reader        = reader
         self.hojas         = reader.obtener_hojas()
         self.resultado     = dict(rangos_previos or {})  # {hoja: {rango, rename_map}}
+        # Copia aparte del estado original: 'Guardar rango de esta hoja'
+        # modifica self.resultado al instante (hoja por hoja), así que sin
+        # esta copia, cerrar con 'Cancelar' dejaría aplicados los rangos
+        # que ya se guardaron en esta sesión — aunque el botón diga que
+        # cierra sin guardar cambios.
+        self._resultado_original = dict(rangos_previos or {})
         self._hoja_actual  = None
         self._rename_vars  = {}   # {col_original: StringVar}
         self._enc_var      = tk.IntVar(value=0)
@@ -54,6 +60,7 @@ class SelectorRangos(tk.Toplevel):
         self._build()
         if self.hojas:
             self._seleccionar_hoja(self.hojas[0])
+        self.protocol("WM_DELETE_WINDOW", self._cancelar)
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +98,7 @@ class SelectorRangos(tk.Toplevel):
         btn_cancelar = HoverButton(bar, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
                     text="Cancelar", font=F(10),
                     fg=TEXT_DARK, padx=14, pady=8,
-                    command=self.destroy)
+                    command=self._cancelar)
         btn_cancelar.pack(side=tk.RIGHT, padx=(0, 8))
         Tooltip(btn_cancelar, "Cierra sin guardar cambios en esta ventana.")
 
@@ -151,9 +158,21 @@ class SelectorRangos(tk.Toplevel):
         sec_rango = tk.Frame(parent, bg=BG_MAIN)
         sec_rango.pack(fill=tk.X, padx=20, pady=(14, 0))
 
-        tk.Label(sec_rango, text="Rango de celdas",
+        titulo_rango = tk.Frame(sec_rango, bg=BG_MAIN)
+        titulo_rango.pack(fill=tk.X, anchor="w")
+        tk.Label(titulo_rango, text="Rango de celdas",
                  font=F(10, "bold"),
-                 bg=BG_MAIN, fg=TEXT_DARK).pack(anchor="w")
+                 bg=BG_MAIN, fg=TEXT_DARK).pack(side=tk.LEFT)
+        AyudaInline(
+            titulo_rango,
+            "Este modo abre el archivo con Microsoft Excel real (no solo "
+            "lo lee como datos) para traer valores calculados de fórmulas "
+            "y listas desplegables correctamente. Por eso necesita tener "
+            "Microsoft Excel instalado en este computador — si no lo "
+            "tienes, usa mejor 'Columnas completas' en la ventana "
+            "principal.",
+            bg=BG_MAIN
+        ).pack(side=tk.LEFT, padx=(6, 0))
         tk.Label(sec_rango,
                  text="Notación Excel: B3:R35  —  incluye fila de encabezados",
                  font=F(8, "italic"),
@@ -340,7 +359,7 @@ class SelectorRangos(tk.Toplevel):
             df = self.reader.leer_rango(self._hoja_actual, rango,
                                          fila_encabezado=enc_fila)
         except Exception as e:
-            messagebox.showerror("Error al leer rango", str(e), parent=self)
+            messagebox.showerror("Error al leer rango", explicar_error(e), parent=self)
             return
 
         if df.empty:
@@ -439,6 +458,20 @@ class SelectorRangos(tk.Toplevel):
                                    "Configura al menos un rango antes de confirmar.",
                                    parent=self)
             return
+        self.destroy()
+
+    def _cancelar(self):
+        if self.resultado != self._resultado_original:
+            if not messagebox.askyesno(
+                "Descartar cambios",
+                "Configuraste rangos en esta sesión que aún no se han "
+                "confirmado.\n¿Cerrar sin guardarlos?",
+                parent=self
+            ):
+                return
+            # Se restaura el estado original para que la ventana que
+            # abrió este diálogo no vea ningún cambio aplicado.
+            self.resultado = self._resultado_original
         self.destroy()
 
     def _limpiar_preview(self):

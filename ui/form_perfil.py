@@ -7,11 +7,13 @@ rangos, destino, horario y notificación.
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+import re
 
 from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
                     SUCCESS, ERROR, TEXT_DARK, TEXT_LIGHT, TEXT_MUTED, BORDER,
                     FORMATOS_DESTINO, F)
-from components import HoverButton, Tooltip, AyudaInline, crear_entry
+from components import (HoverButton, Tooltip, AyudaInline, crear_entry,
+                        recordar_carpeta, ultima_carpeta, explicar_error)
 from core.config_store import ConfigStore
 from core.excel_reader  import ExcelReader
 from core.scheduler     import registrar_tarea, eliminar_tarea
@@ -32,8 +34,37 @@ class FormPerfil(tk.Toplevel):
         self.reader    = ExcelReader()
 
         self._vars = {}
+        self._entries = {}
+        # Guarda, por campo, el texto de ejemplo ("placeholder") que se
+        # muestra en gris cuando el campo está vacío. Se usa para poder
+        # distinguir "el usuario escribió esto" de "quedó el texto de
+        # ejemplo sin tocar" — sin este registro, un perfil nuevo guardaría
+        # literalmente el texto de ejemplo como si fuera un dato real.
+        self._placeholders = {}
         self._build()
         self._cargar_datos()
+
+        # Snapshot del estado inicial, para poder avisar si el usuario
+        # intenta cerrar el formulario con cambios sin guardar.
+        self._snapshot_inicial = self._snapshot()
+        self.protocol("WM_DELETE_WINDOW", self._cancelar)
+
+    def _snapshot(self):
+        return {k: v.get() for k, v in self._vars.items()}
+
+    def _hay_cambios_sin_guardar(self):
+        return self._snapshot() != self._snapshot_inicial
+
+    def _valor(self, key):
+        """
+        Devuelve el valor real de un campo: si lo que está escrito es
+        exactamente el texto de ejemplo (placeholder) que nunca se tocó,
+        lo trata como vacío en vez de guardarlo como dato real.
+        """
+        v = self._vars[key].get().strip()
+        if self._placeholders.get(key) == v:
+            return ""
+        return v
 
     # ── Construcción ──────────────────────────────────────────────────────────
 
@@ -203,7 +234,7 @@ class FormPerfil(tk.Toplevel):
         btn_cancelar = HoverButton(btn_frame, bg_normal="#E8E8E8", bg_hover="#D0D0D0",
                     text="Cancelar", font=F(10),
                     fg=TEXT_DARK, padx=16, pady=8,
-                    command=self.destroy)
+                    command=self._cancelar)
         btn_cancelar.pack(side=tk.LEFT)
         Tooltip(btn_cancelar, "Cierra sin guardar los cambios de este formulario.")
 
@@ -240,6 +271,7 @@ class FormPerfil(tk.Toplevel):
         if ayuda:
             Tooltip(entry, ayuda)
         if placeholder:
+            self._placeholders[key] = placeholder
             entry.insert(0, placeholder)
             entry.config(fg=TEXT_MUTED)
             def _on_focus_in(e, ph=placeholder, v=var, en=entry):
@@ -253,6 +285,7 @@ class FormPerfil(tk.Toplevel):
             entry.bind("<FocusIn>",  _on_focus_in)
             entry.bind("<FocusOut>", _on_focus_out)
         self._vars[key] = var
+        self._entries[key] = entry
 
     def _campo_carpeta(self, key, label, ayuda=None, **kw):
         row = tk.Frame(self.scroll_frame, bg=BG_MAIN)
@@ -264,11 +297,15 @@ class FormPerfil(tk.Toplevel):
         entry.pack(side=tk.LEFT, padx=(8, 4))
         if ayuda:
             Tooltip(entry, ayuda)
+        def _elegir_carpeta(v=var):
+            elegida = filedialog.askdirectory(parent=self, initialdir=ultima_carpeta())
+            if elegida:
+                v.set(elegida)
+                recordar_carpeta(elegida)
+
         btn = HoverButton(row, bg_normal="#E8F0FE", bg_hover="#C5D8FB",
                     text="…", font=F(10), fg=ACCENT, padx=6, pady=2,
-                    command=lambda v=var: v.set(
-                        filedialog.askdirectory(parent=self) or v.get()
-                    ))
+                    command=_elegir_carpeta)
         btn.pack(side=tk.LEFT)
         Tooltip(btn, "Abre el explorador de archivos para elegir la carpeta.")
         self._vars[key] = var
@@ -320,7 +357,18 @@ class FormPerfil(tk.Toplevel):
 
     def _cargar_datos(self):
         p = self.perfil
-        _sv = lambda key, val: self._vars[key].set(val) if val else None
+
+        def _sv(key, val):
+            if not val:
+                return
+            self._vars[key].set(val)
+            # El valor real cargado no debe verse como texto de ejemplo:
+            # restaura el color normal (si el campo es de los que tienen
+            # placeholder — carpeta_origen/destino no lo usan y no están
+            # en este diccionario).
+            entry = self._entries.get(key)
+            if entry is not None:
+                entry.config(fg=TEXT_DARK)
 
         _sv("nombre",         p.get("nombre", ""))
         _sv("carpeta_origen", p.get("carpeta_origen", ""))
@@ -351,8 +399,8 @@ class FormPerfil(tk.Toplevel):
         self._vars["notif_exito"].set(notif.get("en_exito", False))
 
     def _detectar_hojas(self):
-        carpeta = self._vars["carpeta_origen"].get()
-        patron  = self._vars["patron_archivo"].get()
+        carpeta = self._valor("carpeta_origen")
+        patron  = self._valor("patron_archivo")
         if not carpeta or not patron:
             messagebox.showwarning("Faltan datos",
                                    "Ingresa la carpeta y el patrón antes de detectar hojas.",
@@ -367,15 +415,41 @@ class FormPerfil(tk.Toplevel):
             if hojas:
                 self._combo_hoja.current(0)
         except Exception as e:
-            messagebox.showerror("Error", str(e), parent=self)
+            messagebox.showerror("Error", explicar_error(e), parent=self)
 
-    def _guardar(self):
-        g  = lambda k: self._vars[k].get().strip()
+    def _guardar(self, cerrar=True, avisar=True):
+        """
+        Valida y guarda el perfil.
+        cerrar=False se usa desde 'Probar ahora': guarda sin cerrar la
+        ventana, para poder mostrar el resultado de la prueba en un
+        diálogo que sigue perteneciendo a una ventana que todavía existe
+        (si se cerrara antes, el diálogo de resultado fallaría).
+        Devuelve True si guardó, False si la validación falló.
+        """
+        g  = self._valor
         nombre = g("nombre")
         if not nombre:
             messagebox.showwarning("Campo requerido",
                                    "El nombre del perfil es obligatorio.", parent=self)
-            return
+            return False
+
+        hora = g("hora_ejecucion") or "07:00"
+        if not re.fullmatch(r"([01]?\d|2[0-3]):([0-5]\d)", hora):
+            messagebox.showwarning(
+                "Hora inválida",
+                f"'{hora}' no es una hora válida.\n"
+                "Usa el formato HH:MM en 24 horas, por ejemplo 07:00 o 18:30.",
+                parent=self)
+            return False
+
+        puerto_raw = g("smtp_port") or "587"
+        if not puerto_raw.isdigit():
+            messagebox.showwarning(
+                "Puerto SMTP inválido",
+                f"'{puerto_raw}' no es un número válido de puerto.\n"
+                "Debe ser solo dígitos, por ejemplo 587.",
+                parent=self)
+            return False
 
         rangos_raw = g("rangos")
         rangos = [r.strip() for r in rangos_raw.split(",") if r.strip()] if rangos_raw else []
@@ -396,13 +470,13 @@ class FormPerfil(tk.Toplevel):
                 "modo":           modo,
             },
             "schedule": {
-                "hora":   g("hora_ejecucion") or "07:00",
+                "hora":   hora,
                 "activo": self._vars["activo"].get(),
             },
             "notificacion": {
                 "email_destino": g("email_destino"),
                 "smtp_host":     g("smtp_host"),
-                "smtp_port":     int(g("smtp_port") or 587),
+                "smtp_port":     int(puerto_raw),
                 "smtp_user":     g("smtp_user"),
                 "smtp_pass":     g("smtp_pass"),
                 "en_error":      self._vars["notif_error"].get(),
@@ -425,12 +499,35 @@ class FormPerfil(tk.Toplevel):
             except Exception:
                 pass
 
-        messagebox.showinfo("Guardado", f"Perfil '{nombre}' guardado correctamente.",
-                            parent=self)
+        # El snapshot se actualiza para reflejar que ya no hay cambios
+        # pendientes (si luego el usuario cierra sin tocar nada más, no
+        # se le preguntará innecesariamente).
+        self._snapshot_inicial = self._snapshot()
+
+        if avisar:
+            messagebox.showinfo("Guardado", f"Perfil '{nombre}' guardado correctamente.",
+                                parent=self)
+        if cerrar:
+            self.destroy()
+        return True
+
+    def _cancelar(self):
+        if self._hay_cambios_sin_guardar():
+            if not messagebox.askyesno(
+                "Cambios sin guardar",
+                "Tienes cambios sin guardar en este formulario.\n"
+                "¿Salir sin guardarlos?",
+                parent=self
+            ):
+                return
         self.destroy()
 
     def _probar(self):
-        self._guardar()
+        # cerrar=False y avisar=False: guarda en silencio y mantiene la
+        # ventana abierta, para poder mostrar el resultado de la prueba
+        # aquí mismo y dejar que el usuario corrija algo si algo falla.
+        if not self._guardar(cerrar=False, avisar=False):
+            return
         from core.runner import ejecutar_perfil
         from core.logger import RunLogger
         perfil = self.store.obtener_perfil(self.perfil_id)

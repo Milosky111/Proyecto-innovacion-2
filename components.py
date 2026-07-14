@@ -1,9 +1,81 @@
 # components.py
 import tkinter as tk
 from tkinter import ttk
+import os
+import sys
+import subprocess
 # Importamos las constantes necesarias desde config
 from config import (BG_MAIN, BG_CARD, ACCENT, ACCENT_HOVER, TEXT_LIGHT,
                      TEXT_DARK, TEXT_MUTED, BORDER, F)
+
+
+class _UltimaCarpeta:
+    """Guarda, solo durante esta sesión de la app (no se persiste al
+    cerrar), la última carpeta usada en un diálogo de abrir/guardar
+    archivo — así el siguiente diálogo parte desde ahí en vez de
+    siempre volver a la carpeta de inicio del sistema."""
+    ruta = None
+
+
+def recordar_carpeta(ruta_archivo_o_carpeta):
+    """Llamar después de que el usuario elige un archivo o carpeta."""
+    if not ruta_archivo_o_carpeta:
+        return
+    p = ruta_archivo_o_carpeta
+    _UltimaCarpeta.ruta = p if os.path.isdir(p) else os.path.dirname(p)
+
+
+def ultima_carpeta():
+    """Usar como initialdir= en askopenfilename/asksaveasfilename/askdirectory."""
+    return _UltimaCarpeta.ruta or None
+
+
+def explicar_error(e: Exception) -> str:
+    """
+    Traduce las excepciones más comunes (archivo bloqueado por Excel,
+    Excel no instalado, archivo corrupto) a un mensaje claro en español.
+    Si no reconoce el error, devuelve el mensaje técnico tal cual, para
+    no ocultar información que pueda ayudar a diagnosticar algo nuevo.
+    """
+    texto = str(e)
+    baja = texto.lower()
+
+    if isinstance(e, PermissionError) or "permission denied" in baja:
+        return ("No se pudo acceder al archivo — probablemente está "
+                "abierto en Excel o en otro programa.\n"
+                "Ciérralo e inténtalo de nuevo.")
+
+    if ("com error" in baja or "applescript" in baja
+            or "no se pudo encontrar excel" in baja
+            or ("excel" in baja and ("no application" in baja or "not found" in baja))):
+        return ("Esta función necesita tener Microsoft Excel instalado y "
+                "disponible en este computador (se usa para leer fórmulas "
+                "y valores calculados en el modo 'Rangos de celdas').")
+
+    if "bad zip file" in baja or "not a zip file" in baja or "file is not a zip file" in baja:
+        return "El archivo parece estar dañado o no es un Excel válido (.xlsx)."
+
+    return texto
+
+
+def abrir_carpeta_de(ruta_archivo):
+    """
+    Abre, en el explorador de archivos del sistema, la carpeta que
+    contiene 'ruta_archivo'. Se usa después de exportar/generar un
+    archivo para que el usuario pueda verlo de inmediato sin tener que
+    ir a buscarlo a mano. Si algo falla (permisos, SO no soportado),
+    falla en silencio: no interrumpe el flujo por un detalle menor.
+    """
+    carpeta = os.path.dirname(os.path.abspath(ruta_archivo)) or "."
+    try:
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", carpeta])
+        elif sys.platform.startswith("win"):
+            os.startfile(carpeta)
+        else:
+            subprocess.Popen(["xdg-open", carpeta])
+    except Exception:
+        pass
 
 
 class HoverButton(ttk.Button):

@@ -11,7 +11,9 @@ from tkinter import filedialog, messagebox
 
 from config import (BG_MAIN, BG_CARD, ACCENT, TEXT_LIGHT, TEXT_DARK,
                      TEXT_MUTED, SUCCESS, F)
-from components import HoverButton, RenameDialog, aplicar_estilo_ttk
+from components import (HoverButton, RenameDialog, aplicar_estilo_ttk,
+                        abrir_carpeta_de, recordar_carpeta, ultima_carpeta,
+                        explicar_error)
 from core.excel_reader  import ExcelReader
 from core.config_store  import ConfigStore
 from core.logger        import RunLogger
@@ -199,10 +201,12 @@ class ExtractorApp:
     def cargar_archivo(self):
         ruta = filedialog.askopenfilename(
             title="Seleccionar archivo Excel",
-            filetypes=[("Archivos Excel", "*.xlsx *.xls")]
+            filetypes=[("Archivos Excel", "*.xlsx *.xls")],
+            initialdir=ultima_carpeta()
         )
         if not ruta:
             return
+        recordar_carpeta(ruta)
 
         self.ui.lbl_archivo.config(
             text=os.path.basename(ruta), fg=TEXT_DARK,
@@ -224,7 +228,7 @@ class ExtractorApp:
                 "ok"
             )
         except Exception as e:
-            messagebox.showerror("Error al cargar", str(e))
+            messagebox.showerror("Error al cargar", explicar_error(e))
             self._set_estado("Error al cargar archivo", "error")
 
     def cargar_columnas(self, event=None):
@@ -254,7 +258,7 @@ class ExtractorApp:
             self._set_estado(f"Hoja '{hoja}' cargada\nSelecciona columnas", "ok")
             self._actualizar_contador()
         except Exception as e:
-            messagebox.showerror("Error al leer hoja", str(e))
+            messagebox.showerror("Error al leer hoja", explicar_error(e))
             self._set_estado("Error al leer hoja", "error")
 
     # ── Exportación manual ────────────────────────────────────────────────────
@@ -286,11 +290,13 @@ class ExtractorApp:
         ruta = filedialog.asksaveasfilename(
             title="Guardar como…",
             defaultextension=".xlsx",
-            filetypes=[("Archivos Excel", "*.xlsx")]
+            filetypes=[("Archivos Excel", "*.xlsx")],
+            initialdir=ultima_carpeta()
         )
         if not ruta:
             self._set_estado("Exportación cancelada", "warn")
             return
+        recordar_carpeta(ruta)
         try:
             self._set_estado("Extrayendo rangos…", "info")
             self.root.update()
@@ -326,22 +332,26 @@ class ExtractorApp:
                 fg=SUCCESS, font=F(9, "bold"))
             self._activar_paso(4)
             self._set_estado(f"Exportado\n{n_filas} filas ✔", "ok")
-            messagebox.showinfo(
+            if messagebox.askyesno(
                 "¡Listo!",
-                f"Archivo guardado en:\n{ruta}\n\n{n_filas} filas exportadas.")
+                f"Archivo guardado en:\n{ruta}\n\n{n_filas} filas exportadas.\n\n"
+                "¿Abrir la carpeta donde se guardó?"):
+                abrir_carpeta_de(ruta)
         except Exception as e:
-            messagebox.showerror("Error al exportar", str(e))
+            messagebox.showerror("Error al exportar", explicar_error(e))
             self._set_estado("Error al exportar", "error")
 
     def _exportar_con_nombres(self, mapa_nombres):
         ruta = filedialog.asksaveasfilename(
             title="Guardar como…",
             defaultextension=".xlsx",
-            filetypes=[("Archivos Excel", "*.xlsx")]
+            filetypes=[("Archivos Excel", "*.xlsx")],
+            initialdir=ultima_carpeta()
         )
         if not ruta:
             self._set_estado("Exportación cancelada", "warn")
             return
+        recordar_carpeta(ruta)
 
         try:
             self._set_estado("Generando Excel…", "info")
@@ -364,12 +374,13 @@ class ExtractorApp:
             )
             self._activar_paso(4)
             self._set_estado(f"Exportado\n{n_filas} filas ✔", "ok")
-            messagebox.showinfo(
+            if messagebox.askyesno(
                 "¡Listo!",
-                f"Archivo guardado en:\n{ruta}\n\n{n_filas} filas exportadas."
-            )
+                f"Archivo guardado en:\n{ruta}\n\n{n_filas} filas exportadas.\n\n"
+                "¿Abrir la carpeta donde se guardó?"):
+                abrir_carpeta_de(ruta)
         except Exception as e:
-            messagebox.showerror("Error al exportar", str(e))
+            messagebox.showerror("Error al exportar", explicar_error(e))
             self._set_estado("Error al exportar", "error")
 
 
