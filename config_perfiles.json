@@ -64,6 +64,66 @@
         "en_exito": true
       },
       "creado_en": "2026-07-02T11:51:56.864798"
+    },
+    {
+      "id": "160e62f7-d468-401c-a320-b4f8b6dc56e7",
+      "nombre": "",
+      "carpeta_origen": "",
+      "patron_archivo": "",
+      "hoja": "",
+      "rangos": [],
+      "rename_map": {},
+      "destino": {
+        "tipo": "csv",
+        "carpeta": "",
+        "nombre_archivo": "",
+        "modo": "append"
+      },
+      "schedule": {
+        "hora": "07:00",
+        "activo": false,
+        "ultimo_run": null
+      },
+      "notificacion": {
+        "email_destino": "",
+        "smtp_host": "",
+        "smtp_port": 587,
+        "smtp_user": "",
+        "smtp_pass": "",
+        "en_error": true,
+        "en_exito": false
+      },
+      "creado_en": "2026-07-14T10:38:23.963739"
+    },
+    {
+      "id": "be2556ce-8457-467d-89a0-0ed19a379aa1",
+      "nombre": "",
+      "carpeta_origen": "",
+      "patron_archivo": "",
+      "hoja": "",
+      "rangos": [],
+      "rename_map": {},
+      "destino": {
+        "tipo": "csv",
+        "carpeta": "",
+        "nombre_archivo": "",
+        "modo": "append"
+      },
+      "schedule": {
+        "hora": "07:00",
+        "activo": false,
+        "ultimo_run": null
+      },
+      "notificacion": {
+        "email_destino": "",
+        "smtp_host": "",
+        "smtp_port": 587,
+        "smtp_user": "",
+        "smtp_pass": "",
+        "en_error": true,
+        "en_exito": false
+      },
+      "creado_en": "2026-07-14T10:38:54.881140"
     }
   ],
   "smtp_global": {}
