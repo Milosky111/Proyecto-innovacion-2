@@ -5,7 +5,6 @@ Permite consultar historial por perfil, fecha y estado.
 """
 
 import sqlite3
-import os
 from datetime import datetime
 from config import LOG_DB_PATH
 

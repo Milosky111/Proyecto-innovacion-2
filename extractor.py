@@ -11,9 +11,9 @@ from tkinter import filedialog, messagebox
 
 from config import (BG_MAIN, BG_CARD, ACCENT, TEXT_LIGHT, TEXT_DARK,
                      TEXT_MUTED, SUCCESS, F)
-from components import (HoverButton, RenameDialog, aplicar_estilo_ttk,
+from components import (RenameDialog, aplicar_estilo_ttk,
                         abrir_carpeta_de, recordar_carpeta, ultima_carpeta,
-                        explicar_error)
+                        explicar_error, agregar_reporte_final)
 from core.excel_reader  import ExcelReader
 from core.config_store  import ConfigStore
 from core.logger        import RunLogger
@@ -321,6 +321,8 @@ class ExtractorApp:
                 return
 
             df_final = pd.concat(dfs, ignore_index=True)
+            if self.ui.var_reporte.get():
+                df_final = agregar_reporte_final(df_final)
 
             from core.exporters import _estilizar_xlsx
             df_final.to_excel(ruta, index=False, engine="openpyxl")
@@ -361,9 +363,10 @@ class ExtractorApp:
             df = df.dropna(how="all")
             if mapa_nombres:
                 df = df.rename(columns=mapa_nombres)
+            if self.ui.var_reporte.get():
+                df = agregar_reporte_final(df)
 
-            from core.exporters import _a_xlsx, _estilizar_xlsx
-            import os
+            from core.exporters import _estilizar_xlsx
             df.to_excel(ruta, index=False, engine="openpyxl")
             _estilizar_xlsx(ruta)
             n_filas = len(df)

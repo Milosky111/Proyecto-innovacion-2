@@ -8,7 +8,6 @@ Soporta:
 """
 
 import os
-import re
 import glob
 import pandas as pd
 import openpyxl

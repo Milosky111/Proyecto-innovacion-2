@@ -10,7 +10,6 @@ import os
 import sys
 import subprocess
 import shutil
-from config import CONFIG_PATH
 
 
 # ── Windows Task Scheduler ────────────────────────────────────────────────────

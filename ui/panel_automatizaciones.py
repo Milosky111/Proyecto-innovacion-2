@@ -8,9 +8,9 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import threading
 
-from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
-                    SUCCESS, ERROR, WARNING, TEXT_DARK, TEXT_LIGHT,
-                    TEXT_MUTED, BORDER, F)
+from config import (BG_MAIN, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
+                    SUCCESS, ERROR, TEXT_DARK, TEXT_LIGHT,
+                    TEXT_MUTED, F)
 from components import (HoverButton, Tooltip, AyudaInline, abrir_carpeta_de,
                         recordar_carpeta, ultima_carpeta, explicar_error)
 from core.config_store import ConfigStore

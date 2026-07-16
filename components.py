@@ -58,6 +58,30 @@ def explicar_error(e: Exception) -> str:
     return texto
 
 
+def agregar_reporte_final(df):
+    """
+    Agrega al DataFrame una columna 'REPORTE FINAL' con un resumen legible
+    de cada fila (todas sus columnas en formato "Nombre: valor", separadas
+    por " | "). Se usa cuando el usuario marca la casilla "Incluir columna
+    'REPORTE FINAL' con resumen por fila" antes de exportar.
+    """
+    if df.empty:
+        df["REPORTE FINAL"] = []
+        return df
+
+    def _resumen(fila):
+        partes = [
+            f"{col}: {fila[col]}"
+            for col in df.columns
+            if fila[col] is not None and str(fila[col]).strip() not in ("", "nan")
+        ]
+        return " | ".join(partes)
+
+    df = df.copy()
+    df["REPORTE FINAL"] = df.apply(_resumen, axis=1)
+    return df
+
+
 def abrir_carpeta_de(ruta_archivo):
     """
     Abre, en el explorador de archivos del sistema, la carpeta que

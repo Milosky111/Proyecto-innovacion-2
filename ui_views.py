@@ -1,11 +1,10 @@
 # ui_views.py
 import tkinter as tk
 from tkinter import ttk
-import os
 
 from config import (
-    BG_MAIN, BG_SIDEBAR, BG_CARD, ACCENT, ACCENT_HOVER, SUCCESS, 
-    WARNING, ERROR, TEXT_LIGHT, TEXT_DARK, TEXT_MUTED, BORDER, ROW_EVEN, ROW_ODD, F
+    BG_MAIN, BG_SIDEBAR, BG_CARD, ACCENT, ACCENT_HOVER,
+    ERROR, TEXT_LIGHT, TEXT_DARK, TEXT_MUTED, BORDER, ROW_EVEN, ROW_ODD, F
 )
 from components import HoverButton, Tooltip, AyudaInline, TabButton
 

@@ -21,9 +21,9 @@ El resultado es un dict:
 import tkinter as tk
 from tkinter import ttk, messagebox
 
-from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
-                    SUCCESS, ERROR, TEXT_DARK, TEXT_LIGHT, TEXT_MUTED,
-                    BORDER, ROW_EVEN, ROW_ODD, F)
+from config import (BG_MAIN, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
+                    SUCCESS, TEXT_DARK, TEXT_LIGHT, TEXT_MUTED,
+                    ROW_EVEN, ROW_ODD, F)
 from components import HoverButton, Tooltip, AyudaInline, crear_entry, crear_spinbox, explicar_error
 from core.excel_reader import ExcelReader
 from ui.click_range_selector import ClickRangeSelector
@@ -320,7 +320,6 @@ class SelectorRangos(tk.Toplevel):
             if h == hoja:
                 btn.config(bg=ACCENT, fg=TEXT_LIGHT, font=F(9, "bold"))
             else:
-                tiene = hoja in self.resultado
                 btn.config(
                     bg=BG_SIDEBAR,
                     fg="#5DCA8A" if h in self.resultado else "#A8C4E0",

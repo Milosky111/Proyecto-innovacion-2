@@ -9,8 +9,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import re
 
-from config import (BG_MAIN, BG_CARD, BG_SIDEBAR, ACCENT, ACCENT_HOVER,
-                    SUCCESS, ERROR, TEXT_DARK, TEXT_LIGHT, TEXT_MUTED, BORDER,
+from config import (BG_MAIN, BG_SIDEBAR, ACCENT,
+                    SUCCESS, TEXT_DARK, TEXT_LIGHT, TEXT_MUTED,
                     FORMATOS_DESTINO, F)
 from components import (HoverButton, Tooltip, AyudaInline, crear_entry,
                         recordar_carpeta, ultima_carpeta, explicar_error)
@@ -407,7 +407,6 @@ class FormPerfil(tk.Toplevel):
                                    parent=self)
             return
         try:
-            from datetime import datetime
             ruta = self.reader.resolver_archivo_mensual(carpeta, patron)
             self.reader.abrir(ruta)
             hojas = self.reader.obtener_hojas()
